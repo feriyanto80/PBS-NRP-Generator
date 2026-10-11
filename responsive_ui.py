@@ -76,6 +76,7 @@ class ResponsiveNRP(DWGAutoMixin, NRPApp):
         self.plan_label = tk.StringVar(value="Auto-layout: menunggu proyek")
         self.progress_text = tk.StringVar(value="Akuisisi belum dijalankan")
         self.progress_value = tk.DoubleVar(value=0.0)
+        self.use_reference_cad = tk.BooleanVar(value=True)
         self.layer_flags = {name:tk.BooleanVar(value=True) for name in (
             "feeder","subfeeder","distribution","points","roads","buildings")}
         self.show_point_labels = tk.BooleanVar(value=True)
@@ -306,6 +307,14 @@ class ResponsiveNRP(DWGAutoMixin, NRPApp):
                  font=("Segoe UI",8),justify="left",
                  wraplength=248).pack(fill="x",padx=12)
         self._section(panel,"3. Pemetaan & Simbol")
+        tk.Checkbutton(panel,text="Standar CAD DXF 2018 Lemah Abang",
+                       variable=self.use_reference_cad,bg="white",
+                       font=("Segoe UI",8,"bold"),
+                       command=self.schedule_draw).pack(fill="x",padx=10,pady=(5,3))
+        tk.Label(panel,text="Layer asli: Jalan, buildings, FO 12–288 CORE, "
+                 "ODP/ODC, Homepass, pole T6/T7/T9. PaperSpace A3.",
+                 bg="white",fg="#607487",font=("Segoe UI",8),
+                 justify="left",wraplength=250).pack(fill="x",padx=12,pady=(0,4))
         tk.Label(panel,text="Atur layer yang muncul pada preview, PDF dan DXF",
                  bg="white",fg="#526a7b",anchor="w",
                  font=("Segoe UI",8),wraplength=255).pack(fill="x",padx=12,pady=3)
@@ -970,6 +979,7 @@ class ResponsiveNRP(DWGAutoMixin, NRPApp):
         original=(self.lines,self.points,self.osm)
         self.lines,self.points,self.osm=apply_presentation(*original,self._layer_options())
         # Metadata only, never modify the imported KML/Google records.
+        self.osm["_cad_reference_style"]=bool(self.use_reference_cad.get())
         self.osm["_project_title"]=os.path.splitext(
             os.path.basename(self.path.get() or "PBS NETWORK ROUTE PLAN"))[0]
         self.osm["_cad_reference_style"]=bool(self.cad_reference_style.get())
