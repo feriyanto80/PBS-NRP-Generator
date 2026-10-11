@@ -98,6 +98,24 @@ def draw_osm_pdf(c, osm, xy):
     """
     if not osm:
         return
+    if osm.get("_reference_basemap"):
+        # Native 2018 CAD geometry, registered using the numeric HP anchors.
+        # NO buffered OSM road widths, filled buildings, or guessed footprint.
+        c.saveState()
+        c.setLineJoin(1)
+        c.setLineCap(1)
+        c.setStrokeColorRGB(.58,.58,.58)
+        c.setLineWidth(.12)
+        for geo in osm.get("reference_paths",[]):
+            if len(geo)>=2:
+                _pdf_path(c,[xy(p) for p in geo],closed=False,fill=0)
+        c.setStrokeColorRGB(.52,.52,.52)
+        c.setLineWidth(.15)
+        for geo in osm.get("reference_roads",[]):
+            if len(geo)>=2:
+                _pdf_path(c,[xy(p) for p in geo],closed=False,fill=0)
+        c.restoreState()
+        return
     c.saveState()
     c.setLineJoin(1)
     c.setLineCap(1)
@@ -301,7 +319,21 @@ def draw_dxf(path,lines,points,sheets,osm=None):
         lon,lat=pt
         lat=max(-85,min(85,lat))
         return (R*math.radians(lon), R*math.log(math.tan(math.pi/4+math.radians(lat)/2)))
-    if osm:
+    if reference_mode:
+        from reference_basemap import apply_reference_basemap
+        osm=apply_reference_basemap(osm,points)
+    if osm and osm.get("_reference_basemap"):
+        if "Basic Map" not in doc.layers:
+            doc.layers.new("Basic Map",dxfattribs={"color":251})
+        for geo in osm.get("reference_paths",[]):
+            if len(geo)>=2:
+                m.add_lwpolyline([metric(p) for p in geo],
+                                 dxfattribs={"layer":"Basic Map"})
+        for geo in osm.get("reference_roads",[]):
+            if len(geo)>=2:
+                m.add_lwpolyline([metric(p) for p in geo],
+                                 dxfattribs={"layer":"Jalan"})
+    elif osm:
         for geo in osm.get("buildings",[]):
             if len(geo)>=3:
                 m.add_lwpolyline([metric(p) for p in geo],close=True,
