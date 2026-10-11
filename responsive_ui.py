@@ -496,17 +496,17 @@ class ResponsiveNRP(NRPApp):
             if "| DOWNLOAD |" in message:
                 pct=re.search(r"\((\d+(?:\.\d+)?)%\)",message)
                 fraction=float(pct.group(1))/100 if pct else 0.0
-                return 74+15*((current-1+fraction)/max(1,total))
+                return 74+19*((current-1+.75*fraction)/max(1,total))
             if "| CONNECT " in message or "| RETRY " in message:
-                return 74+15*(current-1)/max(1,total)
+                return 74+19*(current-1)/max(1,total)
             if "| CACHE HIT |" in message or "| CACHE SAVED |" in message:
-                return 74+15*current/max(1,total)
+                return 74+19*(current-1+.75)/max(1,total)
             if "| EXTRACT " in message or "| EXTRACT |" in message:
                 pct=re.search(r"(\d+(?:\.\d+)?)% file",message)
                 fraction=float(pct.group(1))/100 if pct else 0
-                return 89+3*((current-1+fraction)/max(1,total))
+                return 74+19*((current-1+.75+.25*fraction)/max(1,total))
             if "| EXTRACT DONE |" in message or ("DONE" in message and "tile " in message):
-                return 92
+                return 74+19*current/max(1,total)
             if "fase 1/4" in message:return 66
             if "fase 2/4" in message:return 70
             if "fase 3/4" in message:return 74
