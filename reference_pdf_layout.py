@@ -282,4 +282,10 @@ def draw_pdf_reference(path,lines,points,project,page_w,page_h,title,sheets,osm=
     from exact_template import find_reference, overlay_pdf_upper_titleblock
     reference_pdf=(find_reference("pdf") if (osm or {}).get("_cad_reference_style",True) else None)
     if reference_pdf:
-        overlay_pdf_upper_titleblock(path,reference_pdf)
+        overlay_pdf_upper_titleblock(
+            path,reference_pdf,
+            # The reference contains project-specific approvers/identities.
+            # Copy those ONLY when 80+ geographic HP anchors prove this is
+            # the same source project and sheet plan reproduces all five.
+            full_source_project=bool((osm or {}).get("_reference_basemap")
+                                     and len(sheets)==5))

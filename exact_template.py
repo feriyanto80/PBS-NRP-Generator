@@ -189,7 +189,7 @@ def replace_cad_upper_titleblock(doc,layout,source_path):
     return len(imported)
 
 
-def overlay_pdf_upper_titleblock(output_pdf,reference_pdf):
+def overlay_pdf_upper_titleblock(output_pdf,reference_pdf,full_source_project=False):
     """Copy ONLY exact-looking reference glyph pixels into output PDF.
 
     The original AutoCAD PDF is page-rotated 270 degrees. We normalize that,
@@ -199,8 +199,13 @@ def overlay_pdf_upper_titleblock(output_pdf,reference_pdf):
     historical names and signatures but leaves recoverable source content
     in the output PDF! Cropped pixel data prevents that disclosure.
 
-    The editable DXF paper-space frame independently imports the original
-    source CAD entities. Only static legend/cables/logo are templated.
+    The editable DXF paper-space frame independently imports source CAD.
+    For independently-validated *identical* Lemahabang HP registration and
+    matching five-page output, full_source_project optionally reproduces the
+    original project's complete right-side titleblock (including approvals)
+    from the corresponding source PDF page. This is deliberately OFF for
+    unrelated customers, projects, or page counts. Source map geometry is
+    never embedded: only the narrow titleblock raster is copied.
     """
     import fitz
     path=Path(output_pdf)
@@ -215,26 +220,44 @@ def overlay_pdf_upper_titleblock(output_pdf,reference_pdf):
             first=source[0]
         if abs(first.rect.width-1191)>8 or abs(first.rect.height-842)>8:
             raise ValueError("PDF template bukan A3 Landscape")
-        crop=fitz.Rect(993.0,16.0,1158.0,PDF_UPPER_BOTTOM_PT)
-        # A3 reference crop contains no project names or approvals.
-        pixels=first.get_pixmap(matrix=fitz.Matrix(7,7),clip=crop,
-                                colorspace=fitz.csRGB,alpha=False)
-        if pixels.width<500 or pixels.height<1000:
-            raise ValueError("Hasil ekstraksi legenda referensi terlalu kecil")
+        # Full exact titleblock is permitted ONLY for a validated five-sheet
+        # Lemahabang source match. Default remains sanitized legend-only.
+        exact_footer=bool(full_source_project and source.page_count==5
+                          and output.page_count==5)
+        crop=fitz.Rect(993.0,16.0,1158.0,
+                       min(821.0, first.rect.height-11.0) if exact_footer
+                       else PDF_UPPER_BOTTOM_PT)
+        # Do not embed the source PDF as a FormXObject: a clip on vectors
+        # still exposes text/map/approvals as recoverable source content.
+        # A cropped bitmap is genuinely limited to the right titleblock.
+        pixels=None
+        if not exact_footer:
+            pixels=first.get_pixmap(matrix=fitz.Matrix(7,7),clip=crop,
+                                   colorspace=fitz.csRGB,alpha=False)
+            if pixels.width<500 or pixels.height<1000:
+                raise ValueError("Hasil ekstraksi legenda referensi terlalu kecil")
         shared_xref=0
-        for page in output:
+        for index,page in enumerate(output):
+            template_page=source[index] if exact_footer else first
+            if template_page.rotation:
+                template_page.remove_rotation()
+                template_page=source[index]
+            item=pixels if pixels is not None else template_page.get_pixmap(
+                matrix=fitz.Matrix(7,7),clip=crop,
+                colorspace=fitz.csRGB,alpha=False)
             target=fitz.Rect(
                 crop.x0*page.rect.width/first.rect.width,
                 crop.y0*page.rect.height/first.rect.height,
                 crop.x1*page.rect.width/first.rect.width,
                 crop.y1*page.rect.height/first.rect.height)
             page.draw_rect(target,color=None,fill=(1,1,1),overlay=True)
-            if shared_xref:
+            if shared_xref and not exact_footer:
                 page.insert_image(target,xref=shared_xref,
                                   keep_proportion=False,overlay=True)
             else:
-                shared_xref=page.insert_image(target,pixmap=pixels,
-                                              keep_proportion=False,overlay=True)
+                inserted=page.insert_image(target,pixmap=item,
+                                           keep_proportion=False,overlay=True)
+                if not exact_footer: shared_xref=inserted
         dest=path.with_name(path.stem+".template.tmp.pdf")
         output.save(str(dest),garbage=4,deflate=True)
     finally:
