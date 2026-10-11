@@ -52,7 +52,10 @@ class ExactCADNoReconstruction(unittest.TestCase):
             self.assertEqual(len(target.modelspace().query("INSERT")),1)
             self.assertEqual(len(target.blocks.get("T6").query("MTEXT")),1)
             block_ref=next(iter(target.modelspace().query("INSERT")))
-            self.assertAlmostEqual(block_ref.dxf.insert.x+388*block_ref.dxf.xscale,100,places=1)
+            from ezdxf import bbox
+            limits=bbox.extents(list(source.blocks.get("T6")),fast=True)
+            centre=(limits.extmin.x+limits.extmax.x)/2
+            self.assertAlmostEqual(block_ref.dxf.insert.x+centre*block_ref.dxf.xscale,100,places=3)
 
     def test_source_homepass_has_no_symbol(self):
         from reference_pdf_layout import _pdf_point
