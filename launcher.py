@@ -1,4 +1,4 @@
-"""PBS Network Route Plan Generator v1.0.7 — Multi-source building footprints."""
+"""PBS Network Route Plan Generator v1.0.8 — Multi-source building footprints."""
 import os
 import threading
 import tkinter as tk
@@ -30,13 +30,13 @@ class NRPApp(App):
         self.root.title("PBS Network Route Plan Generator v1.0.7")
         self._rename_labels(root)
         self._insert_source_controls()
-        self.status.set("KML/KMZ, OSM dan footprint tambahan siap · v1.0.7")
+        self.status.set("KML/KMZ, OSM dan footprint tambahan siap · v1.0.8")
 
     def _rename_labels(self,widget):
         try:
             current=widget.cget("text")
             if isinstance(current,str):
-                adjusted=current.replace("v1.0.3","v1.0.7").replace("v1.0.4","v1.0.7").replace("v1.0.5","v1.0.7").replace("v1.0.6","v1.0.7")
+                adjusted=current.replace("v1.0.3","v1.0.8").replace("v1.0.4","v1.0.8").replace("v1.0.5","v1.0.8").replace("v1.0.6","v1.0.8").replace("v1.0.7","v1.0.8")
                 if "KML/KMZ" not in adjusted:
                     adjusted=adjusted.replace("Import KMZ","Import KML/KMZ").replace("Pilih file KMZ","Pilih file KML/KMZ").replace("geometri KMZ","geometri KML/KMZ")
                 if adjusted != current:
@@ -196,7 +196,9 @@ class NRPApp(App):
         self.status.set(
             f"OSM {partial}: {len(result.get('roads',[])):,} jalan, "
             f"{len(result.get('buildings',[])):,} polygon OSM; "
-            f"{self.osm['footprint_total']:,} footprint gabungan unik.")
+            f"{self.osm['footprint_total']:,} footprint gabungan unik. "
+            f"Koridor jalan tergabung: {len(self.osm.get('_road_surfaces_v108', [])):,}; "
+            "persimpangan T/X dibersihkan.")
 
     def _osm_failed(self,error,revision):
         self._osm_loading=False
