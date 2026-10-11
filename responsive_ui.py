@@ -6,11 +6,14 @@ One OSM button also attempts size-safe Google Open Buildings enrichment.
 """
 import math
 import os
+import re
 import threading
 import tkinter as tk
 from tkinter import ttk, messagebox
 
-from app import bounds, sheets_for, viewport
+import app as base_app
+from app import bounds, viewport
+from adaptive_sheets import plan_sheets
 from launcher import NRPApp
 from osm_acquisition import fetch_osm
 from google_auto import acquire_google
@@ -28,6 +31,11 @@ class ResponsiveNRP(NRPApp):
         self._osm_loading = False
         self._footprint_loading = False
         self._google_status = "Belum diambil"
+        self._planned_sheets = []
+        self._sheet_report = {}
+        self._planning = False
+        self._running = False
+        self._progress_percent = 0.0
         self._kml_audit = {}
         self._mode = None
         self._active_panel = "map"
@@ -45,6 +53,9 @@ class ResponsiveNRP(NRPApp):
         self.want_dwg = tk.BooleanVar()
         self.status = tk.StringVar(value="Import KML/KMZ untuk memulai")
         self.extra_counts = tk.StringVar(value="OSM 0 · KML 0 · Google 0")
+        self.plan_label = tk.StringVar(value="Auto-layout: menunggu proyek")
+        self.progress_text = tk.StringVar(value="Akuisisi belum dijalankan")
+        self.progress_value = tk.DoubleVar(value=0.0)
         root.title("PBS Network Route Plan Generator v1.0.10")
         root.configure(bg="#eef2f6")
         sw, sh = root.winfo_screenwidth(), root.winfo_screenheight()
@@ -121,6 +132,17 @@ class ResponsiveNRP(NRPApp):
         self.osm_button=tk.Button(panel,text="Ambil / gunakan cache OSM + Google",
                                   command=self.load_osm,wraplength=250)
         self.osm_button.pack(fill="x",padx=12,pady=4)
+        self.acq_progress=ttk.Progressbar(panel,mode="determinate",
+                                         maximum=100,variable=self.progress_value)
+        self.acq_progress.pack(fill="x",padx=12,pady=(8,3))
+        tk.Label(panel,textvariable=self.progress_text,bg="white",
+                 fg="#244861",font=("Segoe UI",8,"bold"),
+                 wraplength=254,justify="left").pack(fill="x",padx=12)
+        self.progress_log=tk.Listbox(panel,height=5,activestyle="none",
+                                     font=("Segoe UI",8),
+                                     fg="#435466",bg="#f5f8fb",relief="flat",
+                                     selectbackground="#d1e1f4")
+        self.progress_log.pack(fill="x",padx=12,pady=(3,8))
         tk.Label(panel,text="Google Open Buildings otomatis jika tile aman; "
                  "tidak diperlukan impor manual.",bg="white",fg="#566476",
                  font=("Segoe UI",8),justify="left",wraplength=248).pack(fill="x",padx=12)
@@ -137,16 +159,20 @@ class ResponsiveNRP(NRPApp):
                  bg="white",font=("Segoe UI",9)).pack(fill="x",padx=10,pady=8)
         self._section(panel,"4. Layout & Sheet")
         tk.Label(panel,text="A3 Landscape · Double-Line Frame\n"
-                 "Overview + 4 detail quadrants",justify="left",
-                 bg="white",font=("Segoe UI",9)).pack(fill="x",padx=10,pady=8)
+                 "Adaptive Network-Aware Auto Pagination",justify="left",
+                 bg="white",font=("Segoe UI",9)).pack(fill="x",padx=10,pady=5)
+        tk.Label(panel,textvariable=self.plan_label,wraplength=255,
+                 justify="left",bg="white",fg="#1c5279",
+                 font=("Segoe UI",8,"bold")).pack(fill="x",padx=12,pady=(0,9))
         self._section(panel,"5. Export")
         tk.Button(panel,text="Pilih ODA File Converter (opsional)",
                   command=self.pick_oda).pack(fill="x",padx=12,pady=7)
         tk.Checkbutton(panel,text="Konversi DWG (butuh ODA)",
                        variable=self.want_dwg,bg="white").pack(anchor="w",padx=8)
-        tk.Button(panel,text="▶ Generate PDF + DXF (+ DWG)",
+        self.generate_button=tk.Button(panel,text="▶ Generate PDF + DXF (+ DWG)",
                   bg="#17813e",fg="white",font=("Segoe UI",10,"bold"),
-                  command=self.export).pack(fill="x",padx=12,pady=11)
+                  command=self.export)
+        self.generate_button.pack(fill="x",padx=12,pady=11)
         tk.Label(panel,text="Zoom: scroll mouse / tombol + −. "
                  "Geser peta: drag mouse. Fit: tampilkan seluruh area.",
                  bg="white",fg="#627281",wraplength=245,
@@ -274,7 +300,8 @@ class ResponsiveNRP(NRPApp):
         project=bounds(self.lines,self.points)
         if kind=="sheet":
             index=max(0,self.sheet.current())
-            return sheets_for(project)[index][1]
+            available=self._planned_sheets or [("Overview",project)]
+            return available[min(index,len(available)-1)][1]
         return project
 
     def _bbox(self,kind):
