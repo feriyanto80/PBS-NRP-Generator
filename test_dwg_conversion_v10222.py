@@ -37,7 +37,8 @@ class ODACLIIntegrationTests(unittest.TestCase):
         with patch("dwg_conversion.subprocess.run",side_effect=runner):
             result=dwg_conversion.convert_dwg(
                 self.dxf,str(self.converter))
-        self.assertEqual(Path(result),self.dxf.with_suffix(".dwg"))
+        self.assertTrue(Path(result).samefile(self.dxf.with_suffix(".dwg")))
+        # Windows temp paths may compare in short 8.3 vs long form.
         self.assertTrue(dwg_conversion._valid_dwg(result))
         self.assertEqual(len(seen),1)
         self.assertFalse(self.dxf.with_name(
