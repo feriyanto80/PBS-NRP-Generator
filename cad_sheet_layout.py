@@ -293,7 +293,7 @@ def attach_a3_layouts(doc,sheets,project_name="",osm=None):
         from original_frame import original_titleblock
         original_titleblock(layout,project_name,title,i,len(sheets),osm or {})
         from exact_template import find_reference, replace_cad_upper_titleblock
-        reference_dxf=find_reference("dxf")
+        reference_dxf=(find_reference("dxf") if (osm or {}).get("_cad_reference_style",True) else None)
         if reference_dxf:
             # Imported original glyphs, hatch patterns and CAD font style:
             # only the static top, not historic project/approvals.
