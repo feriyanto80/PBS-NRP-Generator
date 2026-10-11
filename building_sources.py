@@ -81,7 +81,7 @@ def _geojson_polygons(data):
 
 
 def _wkt_polygons(path, min_confidence, limit):
-    opener = gzip.open if path.lower().endswith(".gz") else open
+    opener = gzip.open if os.fspath(path).lower().endswith(".gz") else open
     with opener(path, "rt", encoding="utf-8-sig", newline="") as stream:
         reader = csv.DictReader(stream)
         names = reader.fieldnames or []
