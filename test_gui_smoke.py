@@ -35,6 +35,25 @@ class DesktopSmokeTest(unittest.TestCase):
             self.assertEqual(app.osm_button.cget("text"),
                              "Ambil / gunakan cache OSM + Google")
             self.assertFalse(hasattr(app,"import_google_button"))
+            app._show_progress_banner()
+            root.update_idletasks()
+            self.assertTrue(app.progress_banner.winfo_ismapped())
+            self.assertTrue(hasattr(app,"banner_download"))
+            self.assertTrue(hasattr(app,"banner_overall"))
+            self.assertIn("feeder",app.layer_flags)
+            self.assertIn("buildings",app.layer_flags)
+            app.lines=[("Distribution","DISTRIBUSI",[(107.0,-6.0),(107.009,-6.009)])]
+            app.points=[("P"+str(i),(107.0+(i%12)*.00065,-6.0-(i//12)*.00065))
+                        for i in range(120)]
+            app.target_points.set(30)
+            app.target_routes.set(30)
+            app.max_detail_sheets.set(3)
+            app.sheet_overlap_pct.set(12.5)
+            app._rebuild_sheet_plan()
+            self.assertLessEqual(len(app._planned_sheets),4)
+            self.assertGreater(len(app._planned_sheets),1)
+            self.assertAlmostEqual(app._sheet_report["overlap_fraction"],.125)
+            self.assertEqual(app._sheet_report["target_points_per_sheet"],30)
         finally:
             root.destroy()
 
