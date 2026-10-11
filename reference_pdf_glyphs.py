@@ -74,6 +74,11 @@ def draw_reference_pdf_glyph(canvas, kind, x, y):
         if resource is None:
             return False
         img,w,h=resource
+        # Source PDF crop includes background whitespace; preserve aspect
+        # while matching modest native CAD symbol print size, not a giant icon.
+        factor=min(1.0,3.25/max(w,h))
+        w*=factor
+        h*=factor
         canvas.drawImage(img,x-w/2,y-h/2,w,h,mask="auto",
                          preserveAspectRatio=False)
         return True
