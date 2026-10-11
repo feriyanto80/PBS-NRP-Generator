@@ -34,6 +34,28 @@ class DesktopSmokeTest(unittest.TestCase):
                     self.assertTrue(app.sidebar.winfo_ismapped())
             self.assertEqual(app.osm_button.cget("text"),
                              "Ambil / gunakan cache OSM + Google")
+            # All five sections support Collapse/Expand independently.
+            self.assertEqual(len(app._section_panels),5)
+            first=app._section_panels["1"]
+            second=app._section_panels["2"]
+            self.assertGreater(len(first["widgets"]),1)
+            self.assertTrue(first["widgets"][0][0].winfo_manager())
+            app._set_section_expanded("1",False)
+            root.update_idletasks()
+            self.assertEqual(first["widgets"][0][0].winfo_manager(),"")
+            self.assertTrue(second["expanded"])
+            app._set_section_expanded("1",True)
+            self.assertTrue(first["widgets"][0][0].winfo_manager())
+            app._set_all_sections(False)
+            self.assertTrue(all(not item["expanded"] for item in app._section_panels.values()))
+            app._set_all_sections(True)
+            self.assertTrue(all(item["expanded"] for item in app._section_panels.values()))
+            # Collapsing is only a UI operation; an active acquisition state remains.
+            app._running=True
+            app._toggle_section("3")
+            self.assertTrue(app._running)
+            app._toggle_section("3")
+            app._running=False
             self.assertFalse(hasattr(app,"import_google_button"))
             app._show_progress_banner()
             root.update_idletasks()
