@@ -29,9 +29,9 @@ jobs:
           python -m pip install -r requirements.txt
           python -m pip install "shapely>=2.0,<3"
       - name: Validate Python syntax
-        run: python -m py_compile app.py launcher.py kml_support.py osm_acquisition.py engineering_render.py building_sources.py drafter_titleblock.py road_topology.py test_wrapper.py test_osm.py test_engineering.py test_buildings.py test_junctions.py google_auto.py responsive_ui.py footprint_classify.py test_responsive.py test_gui_smoke.py test_footprint_audit.py adaptive_sheets.py test_adaptive_sheets.py
+        run: python -m py_compile app.py launcher.py kml_support.py osm_acquisition.py engineering_render.py building_sources.py drafter_titleblock.py road_topology.py test_wrapper.py test_osm.py test_engineering.py test_buildings.py test_junctions.py google_auto.py responsive_ui.py footprint_classify.py test_responsive.py test_gui_smoke.py test_footprint_audit.py adaptive_sheets.py test_adaptive_sheets.py adaptive_sheets.py test_adaptive_sheets.py
       - name: Run regression suite
-        run: python -m unittest -v test_wrapper test_osm test_engineering test_buildings test_junctions test_responsive test_footprint_audit
+        run: python -m unittest -v test_wrapper test_osm test_engineering test_buildings test_junctions test_responsive test_footprint_audit test_adaptive_sheets
       - name: Windows interactive-widget smoke test
         run: python -m unittest -v test_gui_smoke test_adaptive_sheets
       - name: Build portable Windows EXE
