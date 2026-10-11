@@ -112,60 +112,34 @@ def _circle(b,layer,radius,color=None):
 
 
 def install_symbols(doc):
-    """Clean, insertion-origin-centered editable vector block definitions.
-
-    The source CAD's T6/T7 blocks have off-origin internal geometry.
-    They cannot be copied verbatim without rebasing; these symbols retain
-    their semantic names and comparable colors at (0, 0).
-    """
-    for name in SYMBOL_NAMES:
-        if name in doc.blocks:
+    """Install editable CAD blocks from the SAME authority as PDF/map legend."""
+    from template_symbols import (draw_symbol, symbol_layer,
+                                  LEGEND_IDS_LEFT, LEGEND_IDS_RIGHT)
+    for style,font in (
+        ("NRP_REFERENCE_ROMANS","romans.shx"),
+        ("NRP_REFERENCE_TAHOMA","tahoma.ttf"),
+    ):
+        if style not in doc.styles:
+            doc.styles.new(style,dxfattribs={"font":font})
+    kinds=set(SYMBOL_NAMES)|set(LEGEND_IDS_LEFT)|set(LEGEND_IDS_RIGHT)
+    for kind in sorted(kinds):
+        if kind in doc.blocks:
             continue
-        b=doc.blocks.new(name=name,base_point=(0,0))
-        if name in ("T6","T7","T9","TE"):
-            layer={"T6":"NEW POLE T6","T7":"NEW POLE T7",
-                   "T9":"NEW POLE T9","TE":"POLE EXISTING"}[name]
-            color={"T6":2,"T7":2,"T9":5,"TE":8}[name]
-            _circle(b,layer,.86,color)
-            b.add_text(name,dxfattribs={"layer":layer,"height":.78,
-                                        "insert":(-.7,-.28),"color":7})
-        elif name=="ODP":
-            b.add_lwpolyline([(-1.1,-.8),(1.1,-.8),(0,1.1)],
-                             close=True,dxfattribs={"layer":"ODP","color":5})
-        elif name=="ODC":
-            b.add_lwpolyline([(-1.3,-1.0),(1.3,-1.0),(1.3,1.0),(-1.3,1.0)],
-                             close=True,dxfattribs={"layer":"ODC","color":1})
-            b.add_text("ODC",dxfattribs={"layer":"ODC","height":.85,
-                                        "insert":(-.95,-.29)})
-        elif name=="OTB":
-            b.add_lwpolyline([(-1.35,-.75),(1.35,-.75),(1.35,.75),(-1.35,.75)],
-                             close=True,dxfattribs={"layer":"OTB","color":5})
-            b.add_text("OTB",dxfattribs={"layer":"OTB","height":.74,
-                                        "insert":(-1.0,-.22)})
-        elif name=="CLOSURE":
-            b.add_lwpolyline([(-1.3,0),(-.5,.8),(.5,.8),(1.3,0),(.5,-.8),(-.5,-.8)],
-                             close=True,dxfattribs={"layer":"Closure","color":1})
-        elif name=="HH":
-            b.add_lwpolyline([(-1,-1),(1,-1),(1,1),(-1,1)],
-                             close=True,dxfattribs={"layer":"New HH","color":5})
-        elif name=="HP":
-            _circle(b,"Homepass",.65,2)
+        block=doc.blocks.new(name=kind,base_point=(0,0))
+        draw_symbol(block,kind,0,0,size=1.0,layer=symbol_layer(kind))
 
 
 def add_device(doc,model,name,xy,size=2.0,labels=True):
-    ident=classify_network_point(name)
-    if ident is None:
+    from template_symbols import canonical, symbol_layer
+    kind=canonical(name)
+    if kind is None:
         return False
     size=max(0.45,min(2.6,float(size)/2))
-    layer={
-        "ODP":"ODP","ODC":"ODC","OTB":"OTB","T6":"NEW POLE T6",
-        "T7":"NEW POLE T7","T9":"NEW POLE T9","TE":"POLE EXISTING",
-        "CLOSURE":"Closure","HH":"New HH","HP":"Homepass"
-    }[ident]
-    model.add_blockref(ident,xy,dxfattribs={"layer":layer,
-                                            "xscale":size,"yscale":size})
+    model.add_blockref(kind,xy,dxfattribs={
+        "layer":symbol_layer(kind),
+        "xscale":size,"yscale":size})
     if labels:
         model.add_text(str(name)[:64],dxfattribs={
-            "height":1.35, "insert":(xy[0]+2.1*size,xy[1]+1.1*size),
-            "layer":"TEXT"})
+            "height":1.35,"insert":(xy[0]+2.1*size,xy[1]+1.1*size),
+            "layer":"TEXT","style":"NRP_REFERENCE_ROMANS"})
     return True
