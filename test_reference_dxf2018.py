@@ -83,8 +83,12 @@ class DXF2018ReferenceTest(unittest.TestCase):
             self.assertEqual(len(model.query('LWPOLYLINE[layer=="Jalan"]')),1)
             self.assertEqual(len(model.query('LWPOLYLINE[layer=="buildings"]')),1)
             inserts=[item.dxf.name for item in model.query("INSERT")]
-            for marker in ("ODP","ODC","T6","T7","T9","TE","OTB","HP"):
+            # Source 2018 has no inserted HP symbol: Homepass is numbered TEXT.
+            for marker in ("ODP","ODC","T6","T7","T9","TE","OTB"):
                 self.assertIn(marker,inserts)
+            self.assertNotIn("HP",inserts)
+            hp_text=[e.dxf.text for e in model.query('TEXT[layer=="Homepass"]')]
+            self.assertIn("005",hp_text)
             # One A3 map viewport per dynamic PDF sheet. AutoCAD also
             # includes its default viewport, which must not count here.
             for index,(name,_) in enumerate(self.sheets):
