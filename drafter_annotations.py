@@ -119,7 +119,7 @@ def plan_symbols(prepared,project,bounds,radius=1.20):
     return result
 
 
-def plan_labels(prepared, project, bounds, width, size=1.35):
+def plan_labels(prepared, project, bounds, size=1.35):
     """Return (kind,label,point_xy,label_xy,font_size) in page/metric units.
 
     Label rectangles must stay in the map viewport, cannot overlap another
@@ -159,6 +159,14 @@ def plan_labels(prepared, project, bounds, width, size=1.35):
             (0,fs*2.2),(-width_est/2,-fs*2.2),
             (dx*2,fs*.12),(-dx*2-width_est,fs*.12),
         ]
+        # Additional rings preserve every HP number in dense drafter sheets.
+        # A label is omitted only if the whole map viewport is saturated.
+        for ring in range(2,14):
+            distance=ring*max(fs*1.65,2.4)
+            offsets.extend([(distance,0),(-distance-width_est,0),
+                            (0,distance),(-width_est/2,-distance),
+                            (distance,distance),(-distance-width_est,distance),
+                            (distance,-distance),(-distance-width_est,-distance)])
         choice=None
         for offx,offy in offsets:
             bx=dx0+offx;by=dy0+offy
