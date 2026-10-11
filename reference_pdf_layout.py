@@ -209,6 +209,13 @@ def _pdf_map_annotations(c,points,project,style,viewport,sheet_index=0,source_mo
             c.restoreState()
         source_kind="ODT" if kind=="OTB" else kind
         if not draw_reference_pdf_glyph(c,source_kind,render_x,render_y):
+            # When the 2018 CAD map was recognized, NEVER replace a
+            # reference-legend glyph with a Python reconstruction.
+            from template_symbols import LEGEND_IDS_LEFT, LEGEND_IDS_RIGHT
+            if source_mode and source_kind in set(LEGEND_IDS_LEFT+LEGEND_IDS_RIGHT):
+                raise RuntimeError(
+                    f"Simbol {source_kind} tidak terbaca pada legenda PDF asli. "
+                    "Periksa template PDF, jangan gunakan simbol pengganti.")
             draw_symbol(PDFCADAdapter(c),kind,render_x,render_y,size=.70)
     # Lemahabang original HP text: overview approx 2.2pt, detail 4-6pt.
     # v1.0.20 incorrectly printed every HP at approx 3.4pt.
