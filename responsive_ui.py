@@ -1,4 +1,4 @@
-"""Adaptive desktop shell v1.0.12.
+"""Adaptive desktop shell v1.0.13.
 
 Three-pane desktop, two-pane laptop and single-pane small-screen layouts.
 Independent mousewheel/+/- zoom and mouse-drag pan on map and sheet previews.
@@ -69,7 +69,11 @@ class ResponsiveNRP(NRPApp):
         self.plan_label = tk.StringVar(value="Auto-layout: menunggu proyek")
         self.progress_text = tk.StringVar(value="Akuisisi belum dijalankan")
         self.progress_value = tk.DoubleVar(value=0.0)
-        root.title("PBS Network Route Plan Generator v1.0.12")
+        self.google_download_value = tk.DoubleVar(value=0.0)
+        self.google_download_stage = tk.StringVar(value="Google Buildings · menunggu unduhan")
+        self.google_download_detail = tk.StringVar(value="Belum ada file yang sedang diunduh")
+        self.overall_progress_label = tk.StringVar(value="PROGRES PEKERJAAN · 0%")
+        root.title("PBS Network Route Plan Generator v1.0.13")
         root.configure(bg="#eef2f6")
         sw, sh = root.winfo_screenwidth(), root.winfo_screenheight()
         root.geometry(f"{max(620,min(sw-60,1550))}x{max(470,min(sh-95,920))}")
@@ -84,11 +88,38 @@ class ResponsiveNRP(NRPApp):
         root=self.root
         header=tk.Frame(root,bg="#164b82",height=53)
         header.pack(fill="x")
-        tk.Label(header,text="PBS  Network Route Plan Generator   v1.0.12",
+        tk.Label(header,text="PBS  Network Route Plan Generator   v1.0.13",
                  bg="#164b82",fg="white",font=("Segoe UI",15,"bold"),
                  anchor="w").pack(side="left",fill="x",expand=True,padx=16,pady=10)
         self.header_steps=tk.Frame(root,bg="#e4edf6")
         self.header_steps.pack(fill="x")
+        self.progress_banner=tk.Frame(root,bg="#eef5ff",bd=1,relief="solid")
+        self.progress_banner.pack_forget()
+        header=tk.Frame(self.progress_banner,bg="#eef5ff")
+        header.pack(fill="x",padx=12,pady=(5,0))
+        tk.Label(header,text="LIVE JOB PROGRESS",bg="#eef5ff",fg="#19486f",
+                 font=("Segoe UI",10,"bold")).pack(side="left")
+        tk.Label(header,text="Workflow dan unduhan Google ditampilkan TERPISAH",
+                 bg="#eef5ff",fg="#506b82",font=("Segoe UI",8)).pack(side="right")
+        overall_line=tk.Frame(self.progress_banner,bg="#eef5ff")
+        overall_line.pack(fill="x",padx=12,pady=(4,1))
+        tk.Label(overall_line,textvariable=self.overall_progress_label,width=32,
+                 bg="#eef5ff",fg="#24516b",anchor="w",
+                 font=("Segoe UI",9,"bold")).pack(side="left")
+        self.banner_overall=ttk.Progressbar(overall_line,maximum=100,
+                 variable=self.progress_value,mode="determinate")
+        self.banner_overall.pack(side="left",fill="x",expand=True,padx=(6,0))
+        google_line=tk.Frame(self.progress_banner,bg="#eef5ff")
+        google_line.pack(fill="x",padx=12,pady=(1,1))
+        tk.Label(google_line,textvariable=self.google_download_stage,width=32,
+                 bg="#eef5ff",fg="#24516b",anchor="w",
+                 font=("Segoe UI",9,"bold")).pack(side="left")
+        self.banner_download=ttk.Progressbar(google_line,maximum=100,
+                 variable=self.google_download_value,mode="determinate")
+        self.banner_download.pack(side="left",fill="x",expand=True,padx=(6,0))
+        tk.Label(self.progress_banner,textvariable=self.google_download_detail,
+                 bg="#eef5ff",fg="#15364e",anchor="w",
+                 font=("Consolas",9,"bold")).pack(fill="x",padx=12,pady=(2,6))
         for title in ("1 Import KML/KMZ","2 Basemap & Bangunan",
                       "3 Pemetaan","4 Layout & Sheet","5 Export"):
             tk.Label(self.header_steps,text=title,font=("Segoe UI",9,"bold"),
@@ -417,12 +448,61 @@ class ResponsiveNRP(NRPApp):
         percent=max(self._progress_percent,min(100.0,float(percent)))
         self._progress_percent=percent
         self.progress_value.set(percent)
+        self.overall_progress_label.set(f"WORKFLOW · {percent:.0f}% selesai")
         self.progress_text.set(f"{percent:.0f}% · {message}")
+        self._update_google_download_display(message)
         self.status.set(message)
         self.progress_log.insert("end",f"{percent:3.0f}%  {message[:110]}")
         while self.progress_log.size()>25:
             self.progress_log.delete(0)
         self.progress_log.yview_moveto(1.0)
+
+    def _show_progress_banner(self):
+        if not self.progress_banner.winfo_manager():
+            target=self.quicknav if self.quicknav.winfo_manager() else self.body
+            self.progress_banner.pack(fill="x",before=target)
+
+    def _update_google_download_display(self,message):
+        """Parse exact GB progress independently from weighted workflow %."""
+        if "| DOWNLOAD |" in message:
+            match=re.search(
+                r"([0-9.]+)\s*GB\s*/\s*([0-9.]+)\s*GB\s*\(([0-9.]+)%\)",
+                message)
+            if match:
+                downloaded,total,pct=map(float,match.groups())
+                self.google_download_value.set(max(0,min(100,pct)))
+                speed=re.search(r"([0-9.]+)\s*MB/s",message)
+                eta=re.search(r"ETA\s+([0-9]+m\s*[0-9]+s)",message)
+                tile=re.search(r"TILE\s+([0-9]+/[0-9]+)",message)
+                label=tile.group(1) if tile else "1/1"
+                self.google_download_stage.set(
+                    f"GOOGLE TILE {label} · {pct:.1f}%")
+                fields=[f"{downloaded:.3f} / {total:.3f} GB"]
+                if speed:fields.append(f"{speed.group(1)} MB/s")
+                if eta:fields.append(f"ETA {eta.group(1).replace(' ','')}")
+                self.google_download_detail.set("    |    ".join(fields))
+                return
+        if "| EXTRACT |" in message:
+            pct=re.search(r"([0-9.]+)% file",message)
+            self.google_download_stage.set(
+                "GOOGLE · ekstraksi footprint "
+                +(pct.group(1)+"%" if pct else "berjalan"))
+            self.google_download_detail.set(message.split("| EXTRACT |",1)[-1].strip()[:130])
+        elif "| CACHE HIT |" in message:
+            self.google_download_value.set(100)
+            self.google_download_stage.set("GOOGLE · cache ditemukan")
+            self.google_download_detail.set(message.split("| CACHE HIT |",1)[-1].strip()[:130])
+        elif "| CACHE SAVED |" in message:
+            self.google_download_value.set(100)
+            self.google_download_stage.set("GOOGLE · unduhan tersimpan")
+            self.google_download_detail.set(message.split("| CACHE SAVED |",1)[-1].strip()[:130])
+        elif "GOOGLE" in message.upper() and "| CONNECT " in message:
+            self.google_download_stage.set("GOOGLE · menyambungkan ke server")
+        elif "Google Buildings | fase" in message:
+            self.google_download_stage.set("GOOGLE · "+message.split(":",1)[0].replace("Google Buildings |","").strip())
+        elif "Google Buildings | tile " in message and "DONE" in message:
+            self.google_download_value.set(100)
+            self.google_download_stage.set("GOOGLE · tile selesai")
 
     def _rebuild_sheet_plan(self):
         if not self.lines and not self.points:
@@ -558,6 +638,10 @@ class ResponsiveNRP(NRPApp):
         self._osm_loading=True
         self._progress_percent=0.0
         self.progress_log.delete(0,"end")
+        self.google_download_value.set(0)
+        self.google_download_stage.set("GOOGLE · menunggu OSM selesai")
+        self.google_download_detail.set("0.000 GB diunduh · menunggu katalog")
+        self._show_progress_banner()
         self.osm_button.configure(state="disabled",text="Mengambil OSM + Google...")
         self._update_generate_button()
         self._record_progress(1,"Mulai OSM → Google (disk cache + resume) → Merge → Sheet Planning. Generate terkunci.")
@@ -634,6 +718,16 @@ class ResponsiveNRP(NRPApp):
             detail+="; OSM gagal: "+osm_error[:75]
         # 100% is workflow completion, not proof of 100% Google coverage.
         self._record_progress(100,"Job selesai · "+detail)
+        if google.get("status")=="ready":
+            self.google_download_value.set(100)
+            self.google_download_stage.set("GOOGLE · footprint diproses")
+            self.google_download_detail.set(
+                f"{len(google.get('polygons',[])):,} footprint Google · tile tersimpan di cache")
+        elif google.get("status")=="partial":
+            self.google_download_stage.set("GOOGLE · parsial, cek log")
+        else:
+            self.google_download_stage.set("GOOGLE · tidak lengkap")
+            self.google_download_detail.set((google.get("reason") or "Tidak ada footprint Google")[:130])
         self._running=False
         self.osm_button.configure(state="normal",
                                   text="Ambil / gunakan cache OSM + Google")
