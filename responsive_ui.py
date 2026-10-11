@@ -1,8 +1,8 @@
-"""Adaptive desktop shell v1.0.11.
+"""Adaptive desktop shell v1.0.12.
 
 Three-pane desktop, two-pane laptop and single-pane small-screen layouts.
 Independent mousewheel/+/- zoom and mouse-drag pan on map and sheet previews.
-One OSM button also attempts size-safe Google Open Buildings enrichment.
+One OSM button includes full Google tile downloads with disk cache and resume.
 """
 import math
 import os
@@ -31,6 +31,7 @@ class ResponsiveNRP(NRPApp):
         self._osm_loading = False
         self._footprint_loading = False
         self._google_status = "Belum diambil"
+        self._google_cache_dir = ""
         self._planned_sheets = []
         self._sheet_report = {}
         self._planning = False
@@ -56,7 +57,7 @@ class ResponsiveNRP(NRPApp):
         self.plan_label = tk.StringVar(value="Auto-layout: menunggu proyek")
         self.progress_text = tk.StringVar(value="Akuisisi belum dijalankan")
         self.progress_value = tk.DoubleVar(value=0.0)
-        root.title("PBS Network Route Plan Generator v1.0.11")
+        root.title("PBS Network Route Plan Generator v1.0.12")
         root.configure(bg="#eef2f6")
         sw, sh = root.winfo_screenwidth(), root.winfo_screenheight()
         root.geometry(f"{max(620,min(sw-60,1550))}x{max(470,min(sh-95,920))}")
@@ -71,7 +72,7 @@ class ResponsiveNRP(NRPApp):
         root=self.root
         header=tk.Frame(root,bg="#164b82",height=53)
         header.pack(fill="x")
-        tk.Label(header,text="PBS  Network Route Plan Generator   v1.0.11",
+        tk.Label(header,text="PBS  Network Route Plan Generator   v1.0.12",
                  bg="#164b82",fg="white",font=("Segoe UI",15,"bold"),
                  anchor="w").pack(side="left",fill="x",expand=True,padx=16,pady=10)
         self.header_steps=tk.Frame(root,bg="#e4edf6")
@@ -138,13 +139,13 @@ class ResponsiveNRP(NRPApp):
         tk.Label(panel,textvariable=self.progress_text,bg="white",
                  fg="#244861",font=("Segoe UI",8,"bold"),
                  wraplength=254,justify="left").pack(fill="x",padx=12)
-        self.progress_log=tk.Listbox(panel,height=5,activestyle="none",
+        self.progress_log=tk.Listbox(panel,height=7,activestyle="none",
                                      font=("Segoe UI",8),
                                      fg="#435466",bg="#f5f8fb",relief="flat",
                                      selectbackground="#d1e1f4")
         self.progress_log.pack(fill="x",padx=12,pady=(3,8))
-        tk.Label(panel,text="Google Open Buildings otomatis jika tile aman; "
-                 "tidak diperlukan impor manual.",bg="white",fg="#566476",
+        tk.Label(panel,text="Google Open Buildings seluruh tile area, unduh/resume cache; "
+                 "butuh ruang disk hingga beberapa GB.",bg="white",fg="#566476",
                  font=("Segoe UI",8),justify="left",wraplength=248).pack(fill="x",padx=12)
         tk.Label(panel,textvariable=self.extra_counts,bg="white",fg="#1f5279",
                  font=("Segoe UI",8,"bold"),justify="left",
@@ -463,11 +464,8 @@ class ResponsiveNRP(NRPApp):
         self._rebuild_sheet_plan()
 
     def _stage_percentage(self,message):
-        if message.startswith("OSM tile"):
-            match=re.search(r"tile\s+(\d+)\s*/\s*(\d+)",message)
-            if match:
-                done,total=map(int,match.groups())
-                return 5+58*done/max(total,1)
+        # Byte-level download stages retain a true per-tile progress fraction.
+        return 5+58*done/max(total,1)
             return 10
         if message.startswith("OSM"):
             return 8
@@ -506,7 +504,7 @@ class ResponsiveNRP(NRPApp):
         self.progress_log.delete(0,"end")
         self.osm_button.configure(state="disabled",text="Mengambil OSM + Google...")
         self._update_generate_button()
-        self._record_progress(1,"Mulai akuisisi: OSM → Google → Merge → Sheet Planning")
+        self._record_progress(1,"Mulai OSM → Google (disk cache + resume) → Merge → Sheet Planning. Generate terkunci.")
 
         def progress(message):
             try:
@@ -523,6 +521,7 @@ class ResponsiveNRP(NRPApp):
                 osm=fetch_osm(bb,progress=progress)
                 progress(f"OSM: {len(osm.get('roads',[]))} jalan, "
                          f"{len(osm.get('buildings',[]))} bangunan berhasil")
+                self.root.after(0,lambda data=osm:self._osm_intermediate(revision,data))
             except Exception as exc:
                 osm_error=str(exc)
                 progress("OSM: gagal setelah fallback, tetap memeriksa Google")
@@ -536,6 +535,16 @@ class ResponsiveNRP(NRPApp):
             except RuntimeError:
                 pass
         threading.Thread(target=worker,daemon=True).start()
+
+    def _osm_intermediate(self,revision,osm):
+        """Show acquired roads/OSM buildings while Google downloads gigabytes."""
+        if revision!=self._revision or not self._running:
+            return
+        self._raw_osm=osm
+        self._apply_sources()
+        self.progress_text.set(
+            "OSM siap: {} jalan, {} bangunan. Google masih mengunduh/scan cache. Generate terkunci.".format(
+                len(osm.get("roads",[])),len(osm.get("buildings",[]))))
 
     def _acquisition_done(self,revision,osm,google,osm_error):
         # Mark source workers finished before re-enabling any output action.
@@ -563,9 +572,7 @@ class ResponsiveNRP(NRPApp):
         roads=len(self.osm.get("roads",[]))
         buildings=len(self.osm.get("buildings",[]))
         detail=f"{len(self._planned_sheets)} sheet, {roads} jalan, {buildings} bangunan"
-        if self._google_status=="skipped_large":
-            detail+="; Google SKIPPED: tile > batas aman, bukan error proses"
-        elif self._google_status!="ready":
+        if self._google_status!="ready":
             detail+=f"; Google {self._google_status}"
         if osm_error:
             detail+="; OSM gagal: "+osm_error[:75]
