@@ -59,7 +59,7 @@ def canonical(name):
         return "TE"
     # Real field KMZ labels frequently use "NEW POLE 6", "TIANG 7"
     # or "POLE-9" rather than the original engineering T6/T7/T9 IDs.
-    match=re.search(r"\\b(?:POLE|TIANG)\\s+(6|7|9)\\b",text)
+    match=re.search(r"\b(?:POLE|TIANG)\s+(6|7|9)\b",text)
     if match:
         return "T"+match.group(1)
     for kind in ("T6","T7","T9","TE","TL"):
