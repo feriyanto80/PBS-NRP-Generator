@@ -171,6 +171,12 @@ def overlay_pdf_upper_titleblock(output_pdf,reference_pdf):
         if source.page_count<1:
             raise ValueError("PDF template kosong")
         first=source[0]
+        # Original AutoCAD PDF is landscape via page rotation=270, while
+        # its unrotated MediaBox is portrait. Normalize before vector clipping;
+        # otherwise show_pdf_page silently produces an EMPTY title block.
+        if first.rotation:
+            first.remove_rotation()
+            first=source[0]
         if abs(first.rect.width-1191)>8 or abs(first.rect.height-842)>8:
             raise ValueError("PDF template bukan A3 Landscape")
         for page in output:
