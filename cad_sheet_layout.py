@@ -170,13 +170,9 @@ def _build_tab(draw, project, sheetname, index, total, stats):
     line(x,logo_bottom,x+w,logo_bottom)
     logo_x=x+w/2
     logo_y=logo_bottom+14
-    # Editable approximation to provided blue star emblem (not copied artwork).
-    draw.add_lwpolyline([
-        (logo_x-9.5,logo_y-5.3),(logo_x-3.1,logo_y+1.0),
-        (logo_x+1.5,logo_y+8.0),(logo_x+1.0,logo_y-.4),
-        (logo_x+11,logo_y+9.1),(logo_x+3.4,logo_y-1.7),
-        (logo_x+7,logo_y-8.0),(logo_x-1,logo_y-3.0)
-    ],close=True,dxfattribs={"layer":"NRP_TB_LOGO","color":5})
+    from starlite_logo import starlite_logo
+    # Traced original logo geometry; not the previous invented polygon.
+    starlite_logo(draw,logo_x,logo_bottom+4.3,height=18.5)
     text("S T A R L I T E",logo_x-12.5,logo_bottom+3.0,2.3)
 
     revision_bottom=logo_bottom-19
