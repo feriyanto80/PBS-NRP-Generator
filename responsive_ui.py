@@ -19,6 +19,7 @@ from launcher import NRPApp
 from osm_acquisition import fetch_osm
 from google_auto import acquire_google
 from google_stream import default_cache
+from drawing_settings import apply_presentation
 
 
 class ResponsiveNRP(NRPApp):
@@ -69,6 +70,16 @@ class ResponsiveNRP(NRPApp):
         self.plan_label = tk.StringVar(value="Auto-layout: menunggu proyek")
         self.progress_text = tk.StringVar(value="Akuisisi belum dijalankan")
         self.progress_value = tk.DoubleVar(value=0.0)
+        self.layer_flags = {name:tk.BooleanVar(value=True) for name in (
+            "feeder","subfeeder","distribution","points","roads","buildings")}
+        self.show_point_labels = tk.BooleanVar(value=True)
+        self.point_shape = tk.StringVar(value="Circle")
+        self.point_size = tk.DoubleVar(value=2.0)
+        self.target_points = tk.IntVar(value=230)
+        self.target_routes = tk.IntVar(value=300)
+        self.max_detail_sheets = tk.IntVar(value=24)
+        self.sheet_overlap_pct = tk.DoubleVar(value=7.5)
+        self.layout_preset = tk.StringVar(value="Normal")
         self.google_download_value = tk.DoubleVar(value=0.0)
         self.google_download_stage = tk.StringVar(value="Google Buildings · menunggu unduhan")
         self.google_download_detail = tk.StringVar(value="Belum ada file yang sedang diunduh")
@@ -202,13 +213,70 @@ class ResponsiveNRP(NRPApp):
                  font=("Segoe UI",8),justify="left",
                  wraplength=248).pack(fill="x",padx=12)
         self._section(panel,"3. Pemetaan & Simbol")
-        tk.Label(panel,text="Feeder merah · Subfeeder ungu\n"
-                 "Distribusi magenta · Titik kuning",justify="left",
-                 bg="white",font=("Segoe UI",9)).pack(fill="x",padx=10,pady=8)
+        tk.Label(panel,text="Atur layer yang muncul pada preview, PDF dan DXF",
+                 bg="white",fg="#526a7b",anchor="w",
+                 font=("Segoe UI",8),wraplength=255).pack(fill="x",padx=12,pady=3)
+        for key,label in (
+            ("feeder","FEEDER (merah)"),
+            ("subfeeder","SUBFEEDER (ungu)"),
+            ("distribution","DISTRIBUSI (magenta)"),
+            ("points","Titik perangkat (kuning)"),
+            ("roads","Tepi jalan OSM (abu-abu)"),
+            ("buildings","Footprint bangunan"),
+        ):
+            tk.Checkbutton(panel,text=label,bg="white",anchor="w",
+                           variable=self.layer_flags[key],
+                           command=self.schedule_draw).pack(fill="x",padx=10)
+        tk.Checkbutton(panel,text="Tampilkan label titik pada detail PDF/DXF",
+                       bg="white",anchor="w",variable=self.show_point_labels,
+                       command=self.schedule_draw).pack(fill="x",padx=10,pady=(4,0))
+        shape_line=tk.Frame(panel,bg="white")
+        shape_line.pack(fill="x",padx=12,pady=(6,3))
+        tk.Label(shape_line,text="Simbol titik:",bg="white",
+                 font=("Segoe UI",8)).pack(side="left")
+        self.point_combo=ttk.Combobox(shape_line,textvariable=self.point_shape,
+                                      state="readonly",width=12,
+                                      values=("Circle","Square","Triangle"))
+        self.point_combo.pack(side="right",padx=(5,0))
+        self.point_combo.bind("<<ComboboxSelected>>",lambda e:self.schedule_draw())
+        tk.Label(panel,text="Ukuran simbol titik (1–5 pt)",bg="white",
+                 anchor="w",font=("Segoe UI",8)).pack(fill="x",padx=12)
+        tk.Scale(panel,from_=1,to=5,resolution=.5,orient="horizontal",
+                 variable=self.point_size,bg="white",highlightthickness=0,
+                 command=lambda v:self.schedule_draw()).pack(fill="x",padx=12)
         self._section(panel,"4. Layout & Sheet")
-        tk.Label(panel,text="A3 Landscape · Double-Line Frame\n"
-                 "Adaptive Network-Aware Auto Pagination",justify="left",
-                 bg="white",font=("Segoe UI",9)).pack(fill="x",padx=10,pady=5)
+        tk.Label(panel,text="A3 Landscape · Double-Line Frame · Adaptive NRP",
+                 bg="white",fg="#536878",font=("Segoe UI",8),
+                 wraplength=250,justify="left").pack(fill="x",padx=12,pady=4)
+        preset_line=tk.Frame(panel,bg="white")
+        preset_line.pack(fill="x",padx=12,pady=3)
+        tk.Label(preset_line,text="Preset kepadatan:",bg="white",
+                 font=("Segoe UI",8)).pack(side="left")
+        presets=ttk.Combobox(preset_line,state="readonly",width=12,
+                             textvariable=self.layout_preset,
+                             values=("Ringkas","Normal","Detail"))
+        presets.pack(side="right")
+        presets.bind("<<ComboboxSelected>>",self._preset_changed)
+        for caption,var,start,end in (
+            ("Maksimum titik / sheet",self.target_points,30,2500),
+            ("Maksimum ruas / sheet",self.target_routes,30,2500),
+            ("Maksimum sheet detail",self.max_detail_sheets,1,100),
+        ):
+            row=tk.Frame(panel,bg="white")
+            row.pack(fill="x",padx=12,pady=3)
+            tk.Label(row,text=caption,bg="white",font=("Segoe UI",8),
+                     anchor="w").pack(side="left",fill="x",expand=True)
+            tk.Spinbox(row,from_=start,to=end,textvariable=var,
+                       width=7,justify="right").pack(side="right")
+        row=tk.Frame(panel,bg="white")
+        row.pack(fill="x",padx=12,pady=3)
+        tk.Label(row,text="Overlap antarsheet (%)",bg="white",
+                 font=("Segoe UI",8)).pack(side="left",fill="x",expand=True)
+        tk.Spinbox(row,from_=0,to=20,increment=.5,textvariable=self.sheet_overlap_pct,
+                   width=7,justify="right").pack(side="right")
+        tk.Button(panel,text="↻ Hitung Ulang Auto-Layout",
+                  command=self._recalculate_layout,bg="#e3eff9",
+                  fg="#194f7a").pack(fill="x",padx=12,pady=(7,4))
         tk.Label(panel,textvariable=self.plan_label,wraplength=255,
                  justify="left",bg="white",fg="#1c5279",
                  font=("Segoe UI",8,"bold")).pack(fill="x",padx=12,pady=(0,9))
@@ -225,6 +293,36 @@ class ResponsiveNRP(NRPApp):
                  "Geser peta: drag mouse. Fit: tampilkan seluruh area.",
                  bg="white",fg="#627281",wraplength=245,
                  justify="left",font=("Segoe UI",8)).pack(fill="x",padx=12,pady=7)
+
+    def _preset_changed(self,event=None):
+        choices={"Ringkas":(420,520),"Normal":(230,300),"Detail":(110,160)}
+        p,l=choices.get(self.layout_preset.get(),(230,300))
+        self.target_points.set(p)
+        self.target_routes.set(l)
+        self._recalculate_layout()
+
+    def _recalculate_layout(self):
+        if self._running or self._osm_loading:
+            messagebox.showwarning("Akuisisi berjalan",
+                "Pengaturan sheet baru dapat dihitung ulang setelah pekerjaan OSM/Google selesai.")
+            return
+        self._rebuild_sheet_plan()
+
+    def _layer_options(self):
+        choices={key:value.get() for key,value in self.layer_flags.items()}
+        choices["point_labels"]=self.show_point_labels.get()
+        choices["point_shape"]=self.point_shape.get()
+        choices["point_size"]=self.point_size.get()
+        return choices
+
+    def draw_on(self,canvas,bb):
+        """Non-destructive layer settings used in both preview canvases."""
+        original=(self.lines,self.points,self.osm)
+        self.lines,self.points,self.osm=apply_presentation(*original,self._layer_options())
+        try:
+            return super().draw_on(canvas,bb)
+        finally:
+            self.lines,self.points,self.osm=original
 
     def _preview_toolbar(self,parent,title,kind):
         bar=tk.Frame(parent,bg="white")
@@ -514,7 +612,19 @@ class ResponsiveNRP(NRPApp):
         self._update_generate_button()
         try:
             bb=bounds(self.lines,self.points)
-            sheets,report=plan_sheets(self.lines,self.points,bb)
+            try:
+                point_limit=max(30,min(2500,int(self.target_points.get())))
+                route_limit=max(30,min(2500,int(self.target_routes.get())))
+                detail_limit=max(1,min(100,int(self.max_detail_sheets.get())))
+                overlap=max(0,min(20,float(self.sheet_overlap_pct.get())))/100.0
+            except (ValueError,tk.TclError):
+                messagebox.showerror("Pengaturan sheet tidak valid",
+                                     "Periksa nilai target titik, ruas, maksimum sheet, dan overlap.")
+                return
+            sheets,report=plan_sheets(
+                self.lines,self.points,bb,max_details=detail_limit,
+                target_points=point_limit,target_lines=route_limit,
+                overlap=overlap)
             self._planned_sheets=sheets
             self._sheet_report=report
             self.sheet.configure(values=[
@@ -524,8 +634,8 @@ class ResponsiveNRP(NRPApp):
             self._sheet_view=None
             self.plan_label.set(
                 f"{len(sheets)} sheet: 1 Overview + {report['details']} Detail\n"
-                f"Network-density planning · overlap 7.5%\n"
-                f"Target 230 titik / 300 ruas per sheet"
+                f"Network-aware · overlap {overlap*100:.1f}%\n"
+                f"Target {point_limit} titik / {route_limit} ruas · maks. {detail_limit} detail"
             )
             self.schedule_draw()
         finally:
@@ -746,12 +856,15 @@ class ResponsiveNRP(NRPApp):
         if not self._planned_sheets and (self.lines or self.points):
             self._rebuild_sheet_plan()
         old_sheets=base_app.sheets_for
+        original=(self.lines,self.points,self.osm)
+        self.lines,self.points,self.osm=apply_presentation(*original,self._layer_options())
         try:
-            # Existing cumulative PDF exporter calls app.sheets_for(bbox).
+            # Same layer settings on preview, PDF and DXF.
             base_app.sheets_for=lambda _bbox:list(self._planned_sheets)
             super().export()
         finally:
             base_app.sheets_for=old_sheets
+            self.lines,self.points,self.osm=original
 
 
 if __name__=="__main__":
