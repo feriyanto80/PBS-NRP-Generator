@@ -464,20 +464,38 @@ class ResponsiveNRP(NRPApp):
         self._rebuild_sheet_plan()
 
     def _stage_percentage(self,message):
-        # Byte-level download stages retain a true per-tile progress fraction.
-        return 5+58*done/max(total,1)
+        """Stage-based weighted progress, with actual byte fraction for Google tiles."""
+        if message.startswith("OSM tile"):
+            match=re.search(r"tile\s+(\d+)\s*/\s*(\d+)",message)
+            if match:
+                done,total=map(int,match.groups())
+                return 5+58*done/max(total,1)
             return 10
         if message.startswith("OSM"):
             return 8
         if message.startswith("Google Buildings"):
+            tile=re.search(r"TILE\s+(\d+)\s*/\s*(\d+)",message)
+            current,total=(int(tile.group(1)),int(tile.group(2))) if tile else (1,1)
+            current=max(1,min(current,total))
+            if "| DOWNLOAD |" in message:
+                pct=re.search(r"\((\d+(?:\.\d+)?)%\)",message)
+                fraction=float(pct.group(1))/100 if pct else 0.0
+                return 74+15*((current-1+fraction)/max(1,total))
+            if "| CONNECT " in message or "| RETRY " in message:
+                return 74+15*(current-1)/max(1,total)
+            if "| CACHE HIT |" in message or "| CACHE SAVED |" in message:
+                return 74+15*current/max(1,total)
+            if "| EXTRACT " in message or "| EXTRACT |" in message:
+                pct=re.search(r"(\d+(?:\.\d+)?)% file",message)
+                fraction=float(pct.group(1))/100 if pct else 0
+                return 89+3*((current-1+fraction)/max(1,total))
+            if "| EXTRACT DONE |" in message or ("DONE" in message and "tile " in message):
+                return 92
             if "fase 1/4" in message:return 66
             if "fase 2/4" in message:return 70
-            if "tile ditemukan" in message or "batas aman" in message:return 73
-            if "SKIP" in message:return 76
-            if "fase 3/4" in message:return 80
-            if "tile " in message:return 82
-            if "fase 4/4" in message:return 88
-            return 67
+            if "fase 3/4" in message:return 74
+            if "fase 4/4" in message:return 93
+            return 72
         return 5
 
     def _progress(self,message,revision):
