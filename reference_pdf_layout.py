@@ -142,8 +142,9 @@ class PDFCADAdapter:
         c.saveState()
         c.setFillColorRGB(*self._color(attrs))
         # In a canvas scaled by 72/25.4, a 1.5-unit font is 1.5 mm on paper.
-        c.setFont(_system_font(bold=(str(attrs.get("style","")).endswith("TAHOMA")
-                                      and height>=2.5)),height)
+        # Original plotted PDF uses Tahoma regular for technical legends;
+        # CAD ROMANS is a SHX stroke font, not directly embeddable by ReportLab.
+        c.setFont(_system_font(bold=False),height)
         string=str(label or "").replace("%%U","").replace("\n"," ")
         c.drawString(px,py,string)
         c.restoreState()
