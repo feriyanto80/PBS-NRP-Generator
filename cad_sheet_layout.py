@@ -261,6 +261,12 @@ def attach_a3_layouts(doc,sheets,project_name="",osm=None):
     ]:
         if name not in doc.layers:
             doc.layers.new(name,dxfattribs={"color":aci})
+    for style,font in (
+        ("NRP_REFERENCE_ROMANS","romans.shx"),
+        ("NRP_REFERENCE_TAHOMA","tahoma.ttf"),
+    ):
+        if style not in doc.styles:
+            doc.styles.new(style,dxfattribs={"font":font})
     ids=[]
     for i,(title,extent) in enumerate(sheets):
         name=name_for_sheet(i,title)
