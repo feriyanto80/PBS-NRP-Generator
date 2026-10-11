@@ -139,15 +139,21 @@ def draw_symbol(draw,kind,x,y,size=1.0,layer=None):
         line([(-1.0,-.8),(0,1.12),(1.0,-.8)],ink,closed=True)
     elif kind in ("CLOSURE","CLOSURE_EXIST"):
         ink="red" if kind=="CLOSURE" else "black"
-        line([(-1,-.70),(1,.70)],ink)
-        line([(-1,.70),(1,-.70)],ink)
+        # Original DXF legend uses filled bow-tie / opposed wedges,
+        # not the generic crossing X used in earlier NRP releases.
+        fillpoly([(-1.1,-.7),(-1.1,.7),(0,0)],ink)
+        fillpoly([(1.1,.7),(1.1,-.7),(0,0)],ink)
     elif kind in ("COIL","COIL_EXIST"):
         ink="red" if kind=="COIL" else "grey"
         circle(-.55,0,.65,ink)
         circle(.55,0,.65,ink)
     elif kind in ("OTB","ODT"):
         line([(-1,-.8),(1,-.8),(1,.8),(-1,.8)],"blue",True)
-        text("ODT" if kind=="ODT" else "OTB",-.76,-.20,.56,"blue")
+        if kind=="ODT":
+            text("RAK",-.72,.13,.46,"blue")
+            text("OTB",-.72,-.46,.46,"blue")
+        else:
+            text("OTB",-.76,-.20,.56,"blue")
     elif kind in ("HH","HH_EXIST","HH_OTHER"):
         ink={"HH":"blue","HH_EXIST":"black","HH_OTHER":"orange"}[kind]
         line([(-1,-.85),(1,-.85),(1,.85),(-1,.85)],ink,True)
