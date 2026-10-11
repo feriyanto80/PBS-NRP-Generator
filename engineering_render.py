@@ -245,16 +245,30 @@ def draw_pdf(path,lines,points,project,page_w,page_h,title,sheets,osm=None):
             c.setStrokeColor(COLORS.get(cat,COLORS["DISTRIBUSI"]))
             c.setLineWidth(1.15 if cat=="FEEDER" else .50)
             _pdf_path(c,[xy(pt) for pt in geo])
-        # Drawing-style point symbols and labels only on detail pages.
+        # Point symbology configured in Pemetaan & Simbol.
+        style=(osm or {}).get("_drawing_style",{})
+        symbol=str(style.get("point_shape","Circle"))
+        radius=float(style.get("point_size",2.0))
+        show_labels=bool(style.get("point_labels",True))
         c.setFont("Helvetica",4.0)
         for name,geo in points:
             x,y=xy(geo)
             c.setFillColorRGB(.95,.75,.10)
             c.setStrokeColorRGB(.17,.17,.17)
-            c.circle(x,y,1.6,stroke=1,fill=1)
-            if idx>0 and name:
+            if symbol=="Square":
+                c.rect(x-radius,y-radius,2*radius,2*radius,stroke=1,fill=1)
+            elif symbol=="Triangle":
+                mark=c.beginPath()
+                mark.moveTo(x,y+radius*1.2)
+                mark.lineTo(x-radius*1.2,y-radius)
+                mark.lineTo(x+radius*1.2,y-radius)
+                mark.close()
+                c.drawPath(mark,stroke=1,fill=1)
+            else:
+                c.circle(x,y,radius,stroke=1,fill=1)
+            if idx>0 and show_labels and name:
                 c.setFillColorRGB(.13,.13,.13)
-                c.drawString(x+2.6,y+1.2,name[:20])
+                c.drawString(x+radius+1,y+1.2,name[:20])
         c.restoreState()
         _draw_titleblock(c,bx,y0,sidebar-1,map_h,title,sheetname,idx,len(sheets),osm)
         c.showPage()
@@ -287,11 +301,24 @@ def draw_dxf(path,lines,points,sheets,osm=None):
     for name,cat,geo in lines:
         m.add_lwpolyline([metric(p) for p in geo],
                          dxfattribs={"layer":cat if cat in COLORS else "DISTRIBUSI"})
+    style=(osm or {}).get("_drawing_style",{})
+    shape=str(style.get("point_shape","Circle"))
+    radius=float(style.get("point_size",2.0))
+    labels=bool(style.get("point_labels",True))
     for name,geo in points:
         x,y=metric(geo)
-        m.add_circle((x,y),1.3,dxfattribs={"layer":"POINTS"})
-        if name:
-            m.add_text(name[:64],dxfattribs={"height":1.5,"insert":(x+1.5,y+1.5),"layer":"LABELS"})
+        if shape=="Square":
+            vertices=[(x-radius,y-radius),(x+radius,y-radius),
+                      (x+radius,y+radius),(x-radius,y+radius)]
+            m.add_lwpolyline(vertices,close=True,dxfattribs={"layer":"POINTS"})
+        elif shape=="Triangle":
+            vertices=[(x,y+radius*1.2),(x-radius*1.2,y-radius),
+                      (x+radius*1.2,y-radius)]
+            m.add_lwpolyline(vertices,close=True,dxfattribs={"layer":"POINTS"})
+        else:
+            m.add_circle((x,y),radius,dxfattribs={"layer":"POINTS"})
+        if labels and name:
+            m.add_text(name[:64],dxfattribs={"height":1.5,"insert":(x+radius+1,y+radius+1),"layer":"LABELS"})
     doc.header["$INSUNITS"]=6
     doc.saveas(path)
 
@@ -351,10 +378,23 @@ def draw_preview(canvas,bb,lines,points,osm,mainmap):
         if len(coords)>=4:
             canvas.create_line(*coords,fill=COLORS.get(cat,COLORS["DISTRIBUSI"]),
                                width=2 if cat=="FEEDER" else 1)
+    style=(osm or {}).get("_drawing_style",{})
+    radius=float(style.get("point_size",2.0))
+    mark=str(style.get("point_shape","Circle"))
     if mainmap:
         for name,p in points:
             x,y=xy(p)
             if -5<x<w+5 and -5<y<h+5:
-                canvas.create_oval(x-2,y-2,x+2,y+2,fill="#ffcf32",outline="#333")
+                if mark=="Square":
+                    canvas.create_rectangle(x-radius,y-radius,x+radius,y+radius,
+                                            fill="#ffcf32",outline="#333")
+                elif mark=="Triangle":
+                    canvas.create_polygon(x,y-radius*1.3,
+                                          x-radius*1.2,y+radius,
+                                          x+radius*1.2,y+radius,
+                                          fill="#ffcf32",outline="#333")
+                else:
+                    canvas.create_oval(x-radius,y-radius,x+radius,y+radius,
+                                       fill="#ffcf32",outline="#333")
     canvas.create_rectangle(4,4,w-4,h-4,outline="#555")
     canvas.create_rectangle(8,8,w-8,h-8,outline="#aaa")
