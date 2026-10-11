@@ -86,8 +86,8 @@ def _get_one(bb, cache_dir, endpoints, opener, sleep, progress):
         except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError,
                 OSError, ValueError) as exc:
             errors.append(f"{endpoint.split('/')[2]}: {str(exc)[:95]}")
-            if isinstance(exc, urllib.error.HTTPError) and 400 <= exc.code < 500 and exc.code not in (408, 429):
-                raise RuntimeError("Server OSM menolak permintaan: " + errors[-1]) from exc
+            # A mirror may reject a request with 403/404 while other mirrors work.
+            # Try all configured instances before considering tile subdivision.
             if index < len(endpoints) - 1:
                 sleep(min(.25 + index * .5, 1))
     raise RuntimeError("Semua server OSM gagal: " + " | ".join(errors))
