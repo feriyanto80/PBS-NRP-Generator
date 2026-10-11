@@ -1,4 +1,4 @@
-"""Adaptive desktop shell v1.0.10.
+"""Adaptive desktop shell v1.0.11.
 
 Three-pane desktop, two-pane laptop and single-pane small-screen layouts.
 Independent mousewheel/+/- zoom and mouse-drag pan on map and sheet previews.
@@ -56,7 +56,7 @@ class ResponsiveNRP(NRPApp):
         self.plan_label = tk.StringVar(value="Auto-layout: menunggu proyek")
         self.progress_text = tk.StringVar(value="Akuisisi belum dijalankan")
         self.progress_value = tk.DoubleVar(value=0.0)
-        root.title("PBS Network Route Plan Generator v1.0.10")
+        root.title("PBS Network Route Plan Generator v1.0.11")
         root.configure(bg="#eef2f6")
         sw, sh = root.winfo_screenwidth(), root.winfo_screenheight()
         root.geometry(f"{max(620,min(sw-60,1550))}x{max(470,min(sh-95,920))}")
@@ -71,7 +71,7 @@ class ResponsiveNRP(NRPApp):
         root=self.root
         header=tk.Frame(root,bg="#164b82",height=53)
         header.pack(fill="x")
-        tk.Label(header,text="PBS  Network Route Plan Generator   v1.0.10",
+        tk.Label(header,text="PBS  Network Route Plan Generator   v1.0.11",
                  bg="#164b82",fg="white",font=("Segoe UI",15,"bold"),
                  anchor="w").pack(side="left",fill="x",expand=True,padx=16,pady=10)
         self.header_steps=tk.Frame(root,bg="#e4edf6")
