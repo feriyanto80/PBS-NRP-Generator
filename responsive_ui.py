@@ -6,10 +6,11 @@ One OSM button includes full Google tile downloads with disk cache and resume.
 """
 import math
 import os
+import json
 import re
 import threading
 import tkinter as tk
-from tkinter import ttk, messagebox
+from tkinter import ttk, messagebox, filedialog
 
 import app as base_app
 from app import bounds, viewport
@@ -17,6 +18,7 @@ from adaptive_sheets import plan_sheets
 from launcher import NRPApp
 from osm_acquisition import fetch_osm
 from google_auto import acquire_google
+from google_stream import default_cache
 
 
 class ResponsiveNRP(NRPApp):
@@ -31,7 +33,17 @@ class ResponsiveNRP(NRPApp):
         self._osm_loading = False
         self._footprint_loading = False
         self._google_status = "Belum diambil"
-        self._google_cache_dir = ""
+        self._google_cache_dir = default_cache()
+        self._cache_settings = os.path.join(os.path.dirname(default_cache()), "settings.json")
+        try:
+            with open(self._cache_settings,encoding="utf-8") as source:
+                config=json.load(source)
+            selected=config.get("google_cache_dir","")
+            if selected and os.path.isabs(selected):
+                self._google_cache_dir=selected
+        except (OSError,ValueError,TypeError):
+            pass
+        self.cache_dir_text = tk.StringVar(value="Cache Google: "+self._google_cache_dir)
         self._planned_sheets = []
         self._sheet_report = {}
         self._planning = False
@@ -133,6 +145,10 @@ class ResponsiveNRP(NRPApp):
         self.osm_button=tk.Button(panel,text="Ambil / gunakan cache OSM + Google",
                                   command=self.load_osm,wraplength=250)
         self.osm_button.pack(fill="x",padx=12,pady=4)
+        tk.Button(panel,text="Folder Cache Google (pilih disk penyimpanan)",
+                  command=self.choose_google_cache).pack(fill="x",padx=12,pady=(3,2))
+        tk.Label(panel,textvariable=self.cache_dir_text,bg="white",fg="#647484",
+                 font=("Segoe UI",8),justify="left",wraplength=252).pack(fill="x",padx=12,pady=(0,3))
         self.acq_progress=ttk.Progressbar(panel,mode="determinate",
                                          maximum=100,variable=self.progress_value)
         self.acq_progress.pack(fill="x",padx=12,pady=(8,3))
@@ -503,6 +519,28 @@ class ResponsiveNRP(NRPApp):
             return
         self._record_progress(self._stage_percentage(message),message)
 
+    def choose_google_cache(self):
+        """Choose persistent cache drive before a potentially multi-GB download."""
+        if self._running or self._osm_loading:
+            messagebox.showwarning("Cache sedang dipakai",
+                                   "Tunggu pekerjaan selesai sebelum pindah folder cache.")
+            return
+        chosen=filedialog.askdirectory(
+            title="Pilih folder Google Open Buildings Cache (butuh ruang beberapa GB)",
+            initialdir=self._google_cache_dir if os.path.isdir(self._google_cache_dir) else os.path.expanduser("~"))
+        if not chosen:
+            return
+        try:
+            os.makedirs(chosen,exist_ok=True)
+            self._google_cache_dir=os.path.abspath(chosen)
+            self.cache_dir_text.set("Cache Google: "+self._google_cache_dir)
+            os.makedirs(os.path.dirname(self._cache_settings),exist_ok=True)
+            with open(self._cache_settings,"w",encoding="utf-8") as output:
+                json.dump({"google_cache_dir":self._google_cache_dir},output)
+            self.status.set("Lokasi Google cache disimpan: "+self._google_cache_dir)
+        except OSError as exc:
+            messagebox.showerror("Folder Cache",str(exc))
+
     def load_osm(self):
         if not self.use_osm.get():
             self.status.set("Aktifkan checkbox OSM jalan & bangunan dahulu.")
@@ -544,7 +582,7 @@ class ResponsiveNRP(NRPApp):
                 osm_error=str(exc)
                 progress("OSM: gagal setelah fallback, tetap memeriksa Google")
             try:
-                google=acquire_google(bb,progress=progress)
+                google=acquire_google(bb,progress=progress,cache_dir=self._google_cache_dir)
             except Exception as exc:
                 google={"polygons":[],"status":"unavailable","reason":str(exc)}
             try:
