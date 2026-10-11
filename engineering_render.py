@@ -15,8 +15,8 @@ from reference_cad_profile import add_reference_layers, install_symbols, add_dev
 
 DEFAULT_ROAD_WIDTH_M = 5.5
 ROAD_COLOR = (0.66, 0.66, 0.66)
-BUILDING_STROKE = (0.51, 0.55, 0.61)
-BUILDING_FILL = (0.946, 0.955, 0.967)
+BUILDING_STROKE = (0.56, 0.56, 0.56)
+BUILDING_FILL = (1.0, 1.0, 1.0)
 
 
 def _polyline_offsets(points, halfwidth):
@@ -103,13 +103,14 @@ def draw_osm_pdf(c, osm, xy):
     c.setLineCap(1)
     c.setStrokeColorRGB(*BUILDING_STROKE)
     c.setFillColorRGB(*BUILDING_FILL)
-    c.setLineWidth(.30)
+    # Original plotted CAD shows THIN grey outlines, never heavy shaded blocks.
+    c.setLineWidth(.12)
     for geo in osm.get("buildings", []):
         if len(geo) >= 3:
             _pdf_path(c, [xy(p) for p in geo], closed=True, fill=1)
     c.setStrokeColorRGB(*ROAD_COLOR)
     c.setFillColorRGB(1.0, 1.0, 1.0)
-    c.setLineWidth(.43)
+    c.setLineWidth(.16)
     for polygon in build_road_surfaces(osm):
         path = c.beginPath()
         for ring in [polygon["exterior"]] + polygon["holes"]:
@@ -318,25 +319,52 @@ def draw_dxf(path,lines,points,sheets,osm=None):
         m.add_lwpolyline([metric(p) for p in geo],
                          dxfattribs={"layer":route_layer})
     style=(osm or {}).get("_drawing_style",{})
-    shape=str(style.get("point_shape","Circle"))
     radius=float(style.get("point_size",2.0))
     labels=bool(style.get("point_labels",True))
-    for name,geo in points:
+    from drafter_annotations import prepare_points,plan_labels
+    prepared=prepare_points(points)
+    # Homepass in the source DXF = Tahoma TEXT on the Homepass layer.
+    # Place all labels via spatial collisions before writing any entities.
+    if "Homepass" not in doc.layers:
+        doc.layers.new("Homepass",dxfattribs={"color":7})
+    if "PBS_DRAFTER_TAHOMA" not in doc.styles:
+        doc.styles.new("PBS_DRAFTER_TAHOMA",
+                       dxfattribs={"font":"tahoma.ttf"})
+    planned=plan_labels(prepared,metric,
+                       (-1e12,-1e12,1e12,1e12),size=1.7)
+    label_slots={}
+    for kind,label,anchor,label_position,fontsize in planned:
+        key=(kind,label,round(anchor[0],5),round(anchor[1],5))
+        label_slots[key]=label_position
+    seen_devices=set()
+    for name,geo,kind,label in prepared:
         x,y=metric(geo)
-        if reference_mode and add_device(doc,m,name,(x,y),size=radius,labels=labels):
+        key=(kind,label,round(x,5),round(y,5))
+        text_position=label_slots.get(key)
+        if kind=="HP":
+            # HP never becomes an invented yellow circle in either DXF or PDF.
+            if text_position:
+                m.add_text(label,dxfattribs={
+                    "height":2.0,"insert":text_position,
+                    "layer":"Homepass","style":"PBS_DRAFTER_TAHOMA",
+                    "color":7})
             continue
-        if shape=="Square":
-            vertices=[(x-radius,y-radius),(x+radius,y-radius),
-                      (x+radius,y+radius),(x-radius,y+radius)]
-            m.add_lwpolyline(vertices,close=True,dxfattribs={"layer":"POINTS"})
-        elif shape=="Triangle":
-            vertices=[(x,y+radius*1.2),(x-radius*1.2,y-radius),
-                      (x+radius*1.2,y-radius)]
-            m.add_lwpolyline(vertices,close=True,dxfattribs={"layer":"POINTS"})
+        duplicate=(kind,round(x,5),round(y,5))
+        if duplicate in seen_devices:
+            continue
+        seen_devices.add(duplicate)
+        if reference_mode and add_device(doc,m,name,(x,y),
+                                         size=radius,labels=False):
+            pass
         else:
-            m.add_circle((x,y),radius,dxfattribs={"layer":"POINTS"})
-        if labels and name:
-            m.add_text(name[:64],dxfattribs={"height":1.5,"insert":(x+radius+1,y+radius+1),"layer":"LABELS"})
+            # Non-reference style remains a deliberate optional fallback.
+            m.add_circle((x,y),max(.5,radius/2),
+                         dxfattribs={"layer":"POINTS"})
+        if labels and text_position:
+            m.add_text(label[:64],dxfattribs={
+                "height":1.7,"insert":text_position,
+                "layer":"TEXT" if reference_mode else "LABELS",
+                "style":"PBS_DRAFTER_TAHOMA","color":30})
     doc.header["$INSUNITS"]=6
     # CAD sheet parity: each PDF page also receives its own editable A3
     # PaperSpace layout and model viewport, convertible to DWG ACAD2018 by ODA.
