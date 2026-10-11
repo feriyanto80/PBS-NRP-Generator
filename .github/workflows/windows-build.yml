@@ -18,6 +18,14 @@ jobs:
           foreach ($name in @("launcher.py","building_sources.py","drafter_titleblock.py","engineering_render.py","road_topology.py","kml_support.py","osm_acquisition.py","google_auto.py","responsive_ui.py","footprint_classify.py","adaptive_sheets.py","google_stream.py","drawing_settings.py","dwg_provider.py","dwg_ui.py","cad_sheet_layout.py","reference_cad_profile.py","reference_pdf_layout.py","starlite_logo.py","pbs_identity.py","pbs_login_gate.py","original_frame.py","template_symbols.py","exact_template.py","reference_pdf_glyphs.py","drafter_annotations.py","original_dxf_blocks.py","reference_basemap.py","reference_sheets.py")) {
             if (!(Test-Path $name)) { throw "Required source missing: $name" }
           }
+      - name: Upload diagnostic Python source (no client templates)
+        uses: actions/upload-artifact@v4
+        with:
+          name: PBS_NRP_Source_Diagnostics_v1022
+          path: |
+            *.py
+            requirements.txt
+          if-no-files-found: error
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
