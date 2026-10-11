@@ -13,8 +13,8 @@ from road_topology import build_road_surfaces, iter_road_boundaries
 
 DEFAULT_ROAD_WIDTH_M = 5.5
 ROAD_COLOR = (0.66, 0.66, 0.66)
-BUILDING_STROKE = (0.76, 0.76, 0.76)
-BUILDING_FILL = (0.965, 0.965, 0.965)
+BUILDING_STROKE = (0.51, 0.55, 0.61)
+BUILDING_FILL = (0.946, 0.955, 0.967)
 
 
 def _polyline_offsets(points, halfwidth):
@@ -312,7 +312,7 @@ def draw_preview(canvas,bb,lines,points,osm,mainmap):
         for geo in osm.get("buildings",[]):
             if len(geo)<3: continue
             coords=[v for pt in geo for v in xy(pt)]
-            canvas.create_polygon(*coords,fill="#f4f4f4",outline="#b7b7b7",width=.6)
+            canvas.create_polygon(*coords,fill="#e6ebf0",outline="#858f9c",width=1.0)
         # Preview uses the same polygon topology as PDF and DXF.
         for polygon in build_road_surfaces(osm):
             exterior = [coordinate for pt in polygon["exterior"] for coordinate in xy(pt)]
