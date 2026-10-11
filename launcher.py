@@ -1,9 +1,11 @@
 """PBS Network Route Plan Generator v1.0.5 - OSM HTTP 500 recovery."""
+import os
 import threading
 import tkinter as tk
-from tkinter import messagebox
+from tkinter import filedialog, messagebox
 
 from app import App, bounds
+from kml_support import read_source
 from osm_acquisition import fetch_osm
 
 
@@ -13,24 +15,43 @@ class NRPApp(App):
         self.root.title("PBS Network Route Plan Generator v1.0.5")
         self._osm_loading = False
         self._revision = 0
-        self._replace_version(root)
+        self._replace_labels(root)
         self.status.set("KML/KMZ siap · OSM cache + server cadangan aktif")
 
-    def _replace_version(self, widget):
+    def _replace_labels(self, widget):
         try:
             text = widget.cget("text")
-            if isinstance(text, str) and "v1.0.4" in text:
-                widget.configure(text=text.replace("v1.0.4", "v1.0.5"))
+            if isinstance(text, str):
+                fixed = text.replace("v1.0.3", "v1.0.5").replace("v1.0.4", "v1.0.5")
+                fixed = fixed.replace("KMZ", "KML/KMZ") if "KML/KMZ" not in fixed else fixed
+                if text != fixed:
+                    widget.configure(text=fixed)
         except tk.TclError:
             pass
         for child in widget.winfo_children():
-            self._replace_version(child)
+            self._replace_labels(child)
 
-    def open_source(self):
-        before = self.path.get()
-        super().open_source()
-        if self.path.get() != before:
+    def open_kmz(self):
+        path = filedialog.askopenfilename(
+            title="Import Google Earth KML atau KMZ",
+            filetypes=[("Google Earth KML/KMZ", "*.kml *.kmz"),
+                       ("KML", "*.kml"), ("KMZ", "*.kmz")])
+        if not path:
+            return
+        try:
+            lines, points = read_source(path)
+            self.lines, self.points = lines, points
+            self.osm = None
             self._revision += 1
+            self.path.set(path)
+            self.stats.configure(text=(
+                f"Jalur (LineString)  {len(lines):,}\n"
+                f"Titik (Point)       {len(points):,}\n"
+                f"Total geometri     {len(lines)+len(points):,}"))
+            self.status.set(os.path.splitext(path)[1].lstrip(".").upper() + " berhasil dibaca")
+            self.draw()
+        except (ValueError, OSError) as exc:
+            messagebox.showerror("Import gagal", str(exc))
 
     def load_osm(self):
         if not self.use_osm.get():
