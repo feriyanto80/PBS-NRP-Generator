@@ -400,23 +400,46 @@ def draw_preview(canvas,bb,lines,points,osm,mainmap):
         if len(coords)>=4:
             canvas.create_line(*coords,fill=COLORS.get(cat,COLORS["DISTRIBUSI"]),
                                width=2 if cat=="FEEDER" else 1)
+    # Tk preview follows the exact same semantic categories as the
+    # printed legend, PDF map and DXF device blocks.
+    from template_symbols import canonical
     style=(osm or {}).get("_drawing_style",{})
-    radius=float(style.get("point_size",2.0))
-    mark=str(style.get("point_shape","Circle"))
-    if mainmap:
-        for name,p in points:
-            x,y=xy(p)
-            if -5<x<w+5 and -5<y<h+5:
-                if mark=="Square":
-                    canvas.create_rectangle(x-radius,y-radius,x+radius,y+radius,
-                                            fill="#ffcf32",outline="#333")
-                elif mark=="Triangle":
-                    canvas.create_polygon(x,y-radius*1.3,
-                                          x-radius*1.2,y+radius,
-                                          x+radius*1.2,y+radius,
-                                          fill="#ffcf32",outline="#333")
-                else:
-                    canvas.create_oval(x-radius,y-radius,x+radius,y+radius,
-                                       fill="#ffcf32",outline="#333")
+    radius=max(1.0,float(style.get("point_size",2.0)))
+    for name,point in points:
+        x,y=xy(point)
+        if not (-8<x<w+8 and -8<y<h+8):
+            continue
+        kind=canonical(name) or "HP"
+        rr=radius*(1.35 if kind!="HP" else .8)
+        if kind in ("T6","T7","T9","TE","TL"):
+            color={"T6":"#ffd200","T7":"#111111","T9":"#1431f5",
+                   "TE":"#999999","TL":"#ff5c10"}[kind]
+            ink={"T6":"#ec5b0c","T7":"#ffd200","T9":"#ffd200",
+                 "TE":"#222222","TL":"#222222"}[kind]
+            canvas.create_oval(x-rr,y-rr,x+rr,y+rr,fill=color,outline="#222")
+            if rr>=2.2:
+                canvas.create_text(x,y,text=kind,fill=ink,
+                                   font=("Tahoma",max(5,int(rr*.85)),"bold"))
+        elif kind.startswith("ODP") or kind.startswith("ODC"):
+            ink={"ODC":"#ef1922","ODC_EXIST":"#bcbcbc",
+                 "ODP":"#1431f5","ODP16":"#ff5c10",
+                 "ODP24":"#e714c9","ODP_EXIST":"#111111"}.get(kind,"#1431f5")
+            canvas.create_polygon(x,y-rr*1.3,x-rr,y+rr,
+                                  x+rr,y+rr,fill="white",outline=ink,width=1.1)
+        elif kind.startswith("CLOSURE"):
+            ink="#ef1922" if kind=="CLOSURE" else "#111111"
+            canvas.create_line(x-rr,y-rr,x+rr,y+rr,fill=ink,width=1.2)
+            canvas.create_line(x-rr,y+rr,x+rr,y-rr,fill=ink,width=1.2)
+        elif kind in ("OTB","ODT","HH","HH_EXIST","HH_OTHER"):
+            ink=("#1431f5" if kind in ("OTB","ODT","HH") else
+                 "#ff5c10" if kind=="HH_OTHER" else "#111")
+            canvas.create_rectangle(x-rr,y-rr,x+rr,y+rr,outline=ink,fill="white")
+        elif kind in ("COIL","COIL_EXIST"):
+            ink="#ef1922" if kind=="COIL" else "#999999"
+            canvas.create_oval(x-rr,y-rr*.6,x,y+rr*.6,outline=ink)
+            canvas.create_oval(x,y-rr*.6,x+rr,y+rr*.6,outline=ink)
+        else:
+            canvas.create_oval(x-rr,y-rr,x+rr,y+rr,
+                               fill="#ffd200",outline="#111111")
     canvas.create_rectangle(4,4,w-4,h-4,outline="#555")
     canvas.create_rectangle(8,8,w-8,h-8,outline="#aaa")
