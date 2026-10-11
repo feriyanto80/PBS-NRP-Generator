@@ -152,26 +152,31 @@ def acquire_google(bbox, progress=None, cache_dir=None, opener=None,
         except (OSError,ValueError,AttributeError):
             pass
     try:
-        progress("Google Buildings: memeriksa katalog tile resmi")
+        progress("Google Buildings | fase 1/4: mengambil katalog tile resmi (cache 14 hari)")
         data=manifest if manifest is not None else _catalog(directory,opener)
     except (OSError,ValueError,urllib.error.URLError) as exc:
         return {"polygons":[],"source":"GOOGLE_OPEN_BUILDINGS_V3","status":"unavailable",
                 "reason":"Katalog Google gagal: "+str(exc)[:160],"complete":False}
+    progress("Google Buildings | fase 2/4: mencocokkan tile dengan boundary proyek")
     tiles=_matching_tiles(data,bb)
     if not tiles:
         return {"polygons":[],"source":"GOOGLE_OPEN_BUILDINGS_V3","status":"no_coverage",
                 "reason":"Tidak ada cakupan tile Google V3","complete":False}
+    progress(f"Google Buildings | {len(tiles)} tile ditemukan; batas aman {max_download_mb:.0f} MB per tile")
     budget=int(max_download_mb*1024*1024)
     selected=[]
     skipped=[]
     for ident,url,size in tiles:
         if size is not None and size>max_download_mb:
+            progress(f"Google Buildings | SKIP {ident}: {size:,.0f} MB > {max_download_mb:.0f} MB; menghindari unduhan raksasa")
             skipped.append(f"{ident}: {size:.0f} MB")
         elif len(selected)>=max_tiles:
             skipped.append(f"{ident}: batas jumlah tile")
         else:
             selected.append((ident,url))
     if not selected:
+        progress("Google Buildings | fase 3/4: tidak ada tile yang aman untuk diunduh")
+        progress("Google Buildings | fase 4/4: lanjut ke penggabungan OSM; hasil Google = 0, bukan kegagalan UI")
         return {"polygons":[],"source":"GOOGLE_OPEN_BUILDINGS_V3",
                 "status":"skipped_large","complete":False,
                 "tiles_found":len(tiles),"tiles_skipped":len(skipped),
@@ -179,13 +184,14 @@ def acquire_google(bbox, progress=None, cache_dir=None, opener=None,
     polygons=[]
     errors=[]
     for index,(ident,url) in enumerate(selected,1):
-        progress(f"Google Buildings tile {index}/{len(selected)}: {ident}")
+        progress(f"Google Buildings | fase 3/4: mengunduh tile {index}/{len(selected)}: {ident} (batas {max_download_mb:.0f} MB)")
         try:
             data=(tile_loader(url,bb) if tile_loader else
                   _load_tile(url,bb,opener,min_confidence,budget,MAX_FOOTPRINTS-len(polygons)))
             polygons.extend(data)
         except (ValueError,OSError,urllib.error.URLError) as exc:
             errors.append(f"{ident}: {str(exc)[:100]}")
+    progress(f"Google Buildings | fase 4/4: evaluasi {len(polygons):,} polygon, {len(skipped)} tile dilewati, {len(errors)} error")
     complete=not errors and not skipped
     result={"polygons":polygons,"source":"GOOGLE_OPEN_BUILDINGS_V3",
             "status":"ready" if complete else ("partial" if polygons else "unavailable"),
