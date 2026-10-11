@@ -63,7 +63,7 @@ class CadLayoutTests(unittest.TestCase):
                 self.assertIn("AS BUILT DRAWING",labels)
                 self.assertIn("CABLE TYPE",labels)
                 self.assertIn("S T A R L I T E",labels)
-                self.assertTrue(any("SHEET" in t and "OF 3" in t for t in labels))
+                self.assertTrue(any(("SHEET" in t or "Halaman / Page" in t) and "OF 3" in t for t in labels))
                 self.assertTrue(any("LEMAH ABANG" in t for t in labels))
                 self.assertFalse(any("Muhamad" in t for t in labels))
             self.assertEqual(len(doc.modelspace().query("LWPOLYLINE")),4)
