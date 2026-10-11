@@ -236,7 +236,8 @@ class NRPApp(App):
                 canvas.create_line(sx+4,yy+6,w-9,yy+6,fill="#aaa")
                 canvas.create_text(sx+6,yy,text=label,anchor="nw",
                                    fill=color,font=("Segoe UI",6))
-            canvas.create_text((sx+w)/2,h-16,text="SHEET / 5",
+            canvas.create_text((sx+w)/2,h-16,
+                               text=f"SHEET {self.sheet.current()+1}/{len(getattr(self, '_planned_sheets', [])) or 5}",
                                font=("Segoe UI",7,"bold"))
 
     def export(self):
