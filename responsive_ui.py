@@ -1,4 +1,4 @@
-"""Adaptive desktop shell v1.0.20.
+"""Adaptive desktop shell v1.0.21.
 
 Three-pane desktop, two-pane laptop and single-pane small-screen layouts.
 Independent mousewheel/+/- zoom and mouse-drag pan on map and sheet previews.
@@ -93,7 +93,7 @@ class ResponsiveNRP(DWGAutoMixin, NRPApp):
         self.google_download_stage = tk.StringVar(value="Google Buildings · menunggu unduhan")
         self.google_download_detail = tk.StringVar(value="Belum ada file yang sedang diunduh")
         self.overall_progress_label = tk.StringVar(value="PROGRES PEKERJAAN · 0%")
-        root.title("PBS Network Route Plan Generator v1.0.20")
+        root.title("PBS Network Route Plan Generator v1.0.21")
         root.configure(bg="#eef2f6")
         sw, sh = root.winfo_screenwidth(), root.winfo_screenheight()
         dw=max(620,min(sw-60,1550))
@@ -110,7 +110,7 @@ class ResponsiveNRP(DWGAutoMixin, NRPApp):
         root=self.root
         header=tk.Frame(root,bg="#164b82",height=53)
         header.pack(fill="x")
-        tk.Label(header,text="PBS  Network Route Plan Generator   v1.0.20",
+        tk.Label(header,text="PBS  Network Route Plan Generator   v1.0.21",
                  bg="#164b82",fg="white",font=("Segoe UI",15,"bold"),
                  anchor="w").pack(side="left",fill="x",expand=True,padx=16,pady=10)
         self.header_steps=tk.Frame(root,bg="#e4edf6")
@@ -750,10 +750,20 @@ class ResponsiveNRP(DWGAutoMixin, NRPApp):
                 messagebox.showerror("Pengaturan sheet tidak valid",
                                      "Periksa nilai target titik, ruas, maksimum sheet, dan overlap.")
                 return
-            sheets,report=plan_sheets(
-                self.lines,self.points,bb,max_details=detail_limit,
-                target_points=point_limit,target_lines=route_limit,
-                overlap=overlap)
+            # Source-authoritative plotting only when HP georegistration
+            # proves this KML actually belongs to the supplied CAD template.
+            from reference_sheets import reference_sheet_extents
+            exact=(reference_sheet_extents(self.points,bb)
+                   if self.cad_reference_style.get() else None)
+            if exact:
+                sheets=exact
+                report={"details":4,"method":"CAD_SOURCE_2018_5_SHEET",
+                        "sheet_workload":[],"warnings":[]}
+            else:
+                sheets,report=plan_sheets(
+                    self.lines,self.points,bb,max_details=detail_limit,
+                    target_points=point_limit,target_lines=route_limit,
+                    overlap=overlap)
             self._planned_sheets=sheets
             self._sheet_report=report
             self.sheet.configure(values=[
@@ -763,7 +773,7 @@ class ResponsiveNRP(DWGAutoMixin, NRPApp):
             self._sheet_view=None
             self.plan_label.set(
                 f"{len(sheets)} sheet: 1 Overview + {report['details']} Detail\n"
-                f"Network-aware · overlap {overlap*100:.1f}%\n"
+                f"{'CAD Source · 5 lembar' if exact else 'Network-aware'} · overlap {overlap*100:.1f}%\n"
                 f"Target {point_limit} titik / {route_limit} ruas · maks. {detail_limit} detail"
             )
             self.schedule_draw()
