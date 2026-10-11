@@ -7,16 +7,17 @@ class DesktopSmokeTest(unittest.TestCase):
     def test_responsive_relayout_and_controls(self):
         root=tk.Tk()
         try:
-            root.geometry("1470x810")
             app=ResponsiveNRP(root)
-            root.update_idletasks()
+            root.geometry("1470x810")
+            root.update()
+            app._mode=None
             app._layout()
             self.assertEqual(app._mode,"wide")
             self.assertTrue(app.sidebar.winfo_ismapped())
             self.assertTrue(app.map_panel.winfo_ismapped())
             self.assertTrue(app.sheet_panel.winfo_ismapped())
             root.geometry("990x680")
-            root.update_idletasks()
+            root.update()
             app._mode=None
             app._layout()
             self.assertEqual(app._mode,"medium")
