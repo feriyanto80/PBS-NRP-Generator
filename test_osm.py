@@ -45,6 +45,20 @@ class OSMTests(unittest.TestCase):
         osm.fetch_osm(self.bbox, **kwargs)
         self.assertEqual(len(calls), 2)
 
+    def test_http_403_on_one_mirror_tries_next(self):
+        attempts = []
+        def opener(request, timeout=45):
+            attempts.append(request.full_url)
+            if "forbidden" in request.full_url:
+                raise urllib.error.HTTPError(request.full_url, 403, "Forbidden", {}, None)
+            return Response()
+        data = osm.fetch_osm(self.bbox, cache_dir=self.tmp.name, opener=opener,
+                             sleep=lambda sec: None,
+                             endpoints=("https://forbidden.example/api/interpreter",
+                                        "https://working.example/api/interpreter"))
+        self.assertEqual(len(data["roads"]), 1)
+        self.assertEqual(len(attempts), 2)
+
     def test_large_area_is_tiled(self):
         calls = []
         def opener(request, timeout=45):
