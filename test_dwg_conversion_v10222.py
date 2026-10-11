@@ -19,19 +19,19 @@ class ODACLIIntegrationTests(unittest.TestCase):
         self.dxf=self.root/"PBS_NRP_ABD_St_Lemah_Abang.dxf"
         self.dxf.write_bytes(b"DXF 2018 mock fixture")
 
-    def test_success_seven_arguments_unicode_safe_output(self):
+    def test_success_restores_v1021_six_arguments_original_filename(self):
         seen=[]
         def runner(cmd,**kwargs):
             seen.append(cmd)
             self.assertEqual(cmd[0],str(self.converter.resolve()))
             self.assertEqual(cmd[3:],
-                             ["ACAD2018","DWG","0","1","*.dxf"])
-            self.assertEqual(len(cmd),8)
+                             ["ACAD2018","DWG","0","1"])
+            self.assertEqual(len(cmd),7)
             self.assertEqual(list(Path(cmd[1]).glob("*.dxf"))[0].name,
-                             "PBS_NRP_CONVERT.dxf")
+                             self.dxf.name)
             nested=Path(cmd[2])/"nested_from_ODA"
             nested.mkdir()
-            (nested/"PBS_NRP_CONVERT.DWG").write_bytes(
+            (nested/(self.dxf.stem+".DWG")).write_bytes(
                 b"AC1032"+b"\0"*2048)
             return subprocess.CompletedProcess(cmd,0,"","")
         with patch("dwg_conversion.subprocess.run",side_effect=runner):
@@ -49,7 +49,7 @@ class ODACLIIntegrationTests(unittest.TestCase):
         def runner(cmd,**kwargs):
             attempts.append(cmd[6])
             if cmd[6]=="0":
-                (Path(cmd[2])/"PBS_NRP_CONVERT.dwg").write_bytes(
+                (Path(cmd[2])/(self.dxf.stem+".dwg")).write_bytes(
                     b"AC1032"+b"\0"*2048)
             return subprocess.CompletedProcess(cmd,0,"C:/Users/User/Desktop/DWG","")
         with patch("dwg_conversion.subprocess.run",side_effect=runner):
@@ -70,6 +70,7 @@ class ODACLIIntegrationTests(unittest.TestCase):
         contents=log.read_text(encoding="utf-8")
         self.assertIn("stdout: C:/Users/User/Desktop/DWG",contents)
         self.assertIn("filter=*.dxf",contents)
+        self.assertIn("filter=[ODA default]",contents)
         self.assertIn("Exit code: 1",contents)
         self.assertEqual(contents.count("Exit code: 1"),7)
         self.assertIn("CONTROL PROBE: FAILED",contents)
@@ -79,14 +80,14 @@ class ODACLIIntegrationTests(unittest.TestCase):
         calls=[]
         def runner(cmd,**kwargs):
             calls.append(cmd)
-            if len(cmd)==7 and Path(cmd[1]).name=="input":
+            if len(cmd)==8 and Path(cmd[1]).name=="input":
                 (Path(cmd[2])/"PBS_NRP_CONVERT.dwg").write_bytes(
                     b"AC1032"+b"\0"*2048)
             return subprocess.CompletedProcess(cmd,0,"","")
         with patch("dwg_conversion.subprocess.run",side_effect=runner):
             result=dwg_conversion.convert_dwg(self.dxf,str(self.converter))
         self.assertTrue(dwg_conversion._valid_dwg(result))
-        self.assertEqual([len(cmd) for cmd in calls],[8,8,8,7])
+        self.assertEqual([len(cmd) for cmd in calls],[7,7,8])
 
     def test_cad_auditor_sanitizes_dxf_without_changing_original(self):
         import ezdxf
