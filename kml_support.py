@@ -15,11 +15,48 @@ def parse_kml_bytes(source):
     except ET.ParseError as exc:
         raise ValueError(f'XML KML tidak valid: {exc}') from exc
     lines, points = [], []
+    # KML geometry names are often numeric (e.g. 001, 002); the type lives in
+    # the parent Folder or ExtendedData. Keep that authority so symbol classes
+    # in the PDF/legend and CAD blocks match the actual device type.
+    parents={child:parent for parent in root.iter() for child in parent}
+    def get_type(placemark):
+        tokens=[]
+        for entry in placemark.iter():
+            if _tag_name(entry.tag)=="Data":
+                key=(entry.get("name") or "").lower()
+                if any(k in key for k in ("type","device","perangkat","symbol","jenis")):
+                    value=next((c.text for c in entry if _tag_name(c.tag)=="value"),None)
+                    if value:tokens.append(str(value))
+            if _tag_name(entry.tag)=="SimpleData":
+                key=(entry.get("name") or "").lower()
+                if any(k in key for k in ("type","device","perangkat","symbol","jenis")):
+                    if entry.text:tokens.append(entry.text)
+        current=parents.get(placemark)
+        for _ in range(8):
+            if current is None:break
+            if _tag_name(current.tag) in ("Folder","Document"):
+                folder=next((c.text for c in current if _tag_name(c.tag)=="name"),None)
+                if folder:tokens.append(folder)
+            current=parents.get(current)
+        # Only class names appearing as whole words count as authority.
+        from template_symbols import canonical
+        for text in tokens:
+            value=canonical(text)
+            if value:
+                return value
+        return None
     for placemark in root.iter():
         if _tag_name(placemark.tag) != 'Placemark':
             continue
         name = next(((n.text or '').strip() for n in placemark if _tag_name(n.tag) == 'name'), '')
-        upper = name.upper()
+        role=get_type(placemark)
+        # If the own name is a numeric ID but the Folder says T7 or ODP,
+        # provide the type to the downstream symbol classifier.
+        from template_symbols import canonical
+        styled_name=name
+        if role and not canonical(name):
+            styled_name=(role+" "+name).strip()
+        upper = (name+" "+(role or "")).upper()
         category = ('FEEDER' if 'FEEDER' in upper and 'SUB' not in upper else
                     'SUBFEEDER' if 'SUB' in upper else 'DISTRIBUSI')
         for geometry in placemark.iter():
@@ -39,7 +76,7 @@ def parse_kml_bytes(source):
             if kind == 'LineString' and len(xy) >= 2:
                 lines.append((name, category, xy))
             elif kind == 'Point' and xy:
-                points.append((name, xy[0]))
+                points.append((styled_name, xy[0]))
     if not lines and not points:
         raise ValueError('Tidak ada geometri titik/jalur yang terbaca pada KML/KMZ')
     return lines, points
