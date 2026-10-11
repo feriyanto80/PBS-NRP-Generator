@@ -64,7 +64,7 @@ class ODACLIIntegrationTests(unittest.TestCase):
         with patch("dwg_conversion.subprocess.run",side_effect=runner):
             with self.assertRaises(RuntimeError) as caught:
                 dwg_conversion.convert_dwg(self.dxf,str(self.converter))
-        self.assertIn("Log pemeriksaan",str(caught.exception))
+        self.assertIn("Lihat log lengkap:",str(caught.exception))
         log=self.dxf.with_name(self.dxf.stem+"_ODA_Conversion.log")
         self.assertTrue(log.exists())
         contents=log.read_text(encoding="utf-8")
