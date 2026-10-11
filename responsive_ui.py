@@ -1,4 +1,4 @@
-"""Adaptive desktop shell v1.0.16.
+"""Adaptive desktop shell v1.0.17.
 
 Three-pane desktop, two-pane laptop and single-pane small-screen layouts.
 Independent mousewheel/+/- zoom and mouse-drag pan on map and sheet previews.
@@ -92,7 +92,7 @@ class ResponsiveNRP(DWGAutoMixin, NRPApp):
         self.google_download_stage = tk.StringVar(value="Google Buildings · menunggu unduhan")
         self.google_download_detail = tk.StringVar(value="Belum ada file yang sedang diunduh")
         self.overall_progress_label = tk.StringVar(value="PROGRES PEKERJAAN · 0%")
-        root.title("PBS Network Route Plan Generator v1.0.16")
+        root.title("PBS Network Route Plan Generator v1.0.17")
         root.configure(bg="#eef2f6")
         sw, sh = root.winfo_screenwidth(), root.winfo_screenheight()
         root.geometry(f"{max(620,min(sw-60,1550))}x{max(470,min(sh-95,920))}")
@@ -107,7 +107,7 @@ class ResponsiveNRP(DWGAutoMixin, NRPApp):
         root=self.root
         header=tk.Frame(root,bg="#164b82",height=53)
         header.pack(fill="x")
-        tk.Label(header,text="PBS  Network Route Plan Generator   v1.0.16",
+        tk.Label(header,text="PBS  Network Route Plan Generator   v1.0.17",
                  bg="#164b82",fg="white",font=("Segoe UI",15,"bold"),
                  anchor="w").pack(side="left",fill="x",expand=True,padx=16,pady=10)
         self.header_steps=tk.Frame(root,bg="#e4edf6")
@@ -966,6 +966,10 @@ class ResponsiveNRP(DWGAutoMixin, NRPApp):
                 "\n\nGenerate diaktifkan kembali; PDF akan memperingatkan jika basemap tidak lengkap.")
 
     def export(self):
+        gate=getattr(self.root,"_pbs_auth_gate",None)
+        if gate is not None and not gate.session:
+            messagebox.showerror("PBS ID", "Sesi PBS Central tidak aktif. Login diperlukan.")
+            return
         if self._running or self._osm_loading or self._footprint_loading or self._planning:
             messagebox.showwarning("Export terkunci",
                 "Tunggu akuisisi OSM/Google dan perhitungan sheet selesai.")
@@ -979,7 +983,6 @@ class ResponsiveNRP(DWGAutoMixin, NRPApp):
         original=(self.lines,self.points,self.osm)
         self.lines,self.points,self.osm=apply_presentation(*original,self._layer_options())
         # Metadata only, never modify the imported KML/Google records.
-        self.osm["_cad_reference_style"]=bool(self.use_reference_cad.get())
         self.osm["_project_title"]=os.path.splitext(
             os.path.basename(self.path.get() or "PBS NETWORK ROUTE PLAN"))[0]
         self.osm["_cad_reference_style"]=bool(self.cad_reference_style.get())
@@ -995,6 +998,7 @@ class ResponsiveNRP(DWGAutoMixin, NRPApp):
 
 
 if __name__=="__main__":
+    from pbs_login_gate import start_gated
     root=tk.Tk()
-    ResponsiveNRP(root)
+    start_gated(root,ResponsiveNRP)
     root.mainloop()
