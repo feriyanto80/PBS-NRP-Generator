@@ -10,6 +10,7 @@ from reportlab.pdfgen import canvas as pdfcanvas
 
 from app import COLORS, viewport
 from road_topology import build_road_surfaces, iter_road_boundaries
+from cad_sheet_layout import attach_a3_layouts
 
 DEFAULT_ROAD_WIDTH_M = 5.5
 ROAD_COLOR = (0.66, 0.66, 0.66)
@@ -216,7 +217,7 @@ def _draw_titleblock(c, x, y, w, h, title, sheetname, index, count, osm):
 
 
 def draw_pdf(path,lines,points,project,page_w,page_h,title,sheets,osm=None):
-    """A3 5-sheet engineering PDF with real building polygons and road edges."""
+    """A3 sheet-matched engineering PDF with buildings and road corridors."""
     c=pdfcanvas.Canvas(path,pagesize=(page_w,page_h))
     sidebar=177
     x0,y0=22,21
@@ -320,6 +321,10 @@ def draw_dxf(path,lines,points,sheets,osm=None):
         if labels and name:
             m.add_text(name[:64],dxfattribs={"height":1.5,"insert":(x+radius+1,y+radius+1),"layer":"LABELS"})
     doc.header["$INSUNITS"]=6
+    # CAD sheet parity: each PDF page also receives its own editable A3
+    # PaperSpace layout and model viewport, convertible to DWG ACAD2018 by ODA.
+    project_name=(osm or {}).get("_project_title","PBS NETWORK ROUTE PLAN")
+    attach_a3_layouts(doc,sheets,project_name=project_name,osm=osm)
     doc.saveas(path)
 
 
