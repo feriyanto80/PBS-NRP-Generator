@@ -71,7 +71,38 @@ class ODACLIIntegrationTests(unittest.TestCase):
         self.assertIn("stdout: C:/Users/User/Desktop/DWG",contents)
         self.assertIn("filter=*.dxf",contents)
         self.assertIn("Exit code: 1",contents)
-        self.assertEqual(contents.count("Exit code: 1"),2)
+        self.assertEqual(contents.count("Exit code: 1"),7)
+        self.assertIn("CONTROL PROBE: FAILED",contents)
+
+
+    def test_default_filter_fallback(self):
+        calls=[]
+        def runner(cmd,**kwargs):
+            calls.append(cmd)
+            if len(cmd)==7 and Path(cmd[1]).name=="input":
+                (Path(cmd[2])/"PBS_NRP_CONVERT.dwg").write_bytes(
+                    b"AC1032"+b"\0"*2048)
+            return subprocess.CompletedProcess(cmd,0,"","")
+        with patch("dwg_conversion.subprocess.run",side_effect=runner):
+            result=dwg_conversion.convert_dwg(self.dxf,str(self.converter))
+        self.assertTrue(dwg_conversion._valid_dwg(result))
+        self.assertEqual([len(cmd) for cmd in calls],[8,8,8,7])
+
+    def test_cad_auditor_sanitizes_dxf_without_changing_original(self):
+        import ezdxf
+        sample=self.root/"unsanitized.dxf"
+        doc=ezdxf.new("R2018")
+        doc.modelspace().add_line((10,10),(20,20),
+                                  dxfattribs={"linetype":"dashed2"})
+        doc.saveas(sample)
+        original=sample.read_bytes()
+        staged=self.root/"staged.dxf"
+        log=[]
+        dwg_conversion._sanitize_dxf(sample,staged,log)
+        self.assertEqual(sample.read_bytes(),original)
+        check=ezdxf.readfile(staged).audit()
+        self.assertEqual(len(check.errors),0)
+        self.assertEqual(len(check.fixes),0)
 
     def test_reject_non_dwg_output_header(self):
         def runner(cmd,**kwargs):

@@ -421,6 +421,14 @@ def draw_dxf(path,lines,points,sheets,osm=None):
     # PaperSpace layout and model viewport, convertible to DWG ACAD2018 by ODA.
     project_name=(osm or {}).get("_project_title","PBS NETWORK ROUTE PLAN")
     attach_a3_layouts(doc,sheets,project_name=project_name,osm=osm)
+    # Original CAD layout can introduce unresolved DASHED2 linetypes and
+    # annotation-scale dictionary keys. Audit before saving so ODA 27.9 does
+    # not receive avoidable invalid DXF references.
+    cad_audit=doc.audit()
+    if cad_audit.errors:
+        raise ValueError(
+            f"DXF menghasilkan {len(cad_audit.errors)} error CAD. "
+            "Ekspor DWG dihentikan; periksa geometri atau template.")
     doc.saveas(path)
 
 
