@@ -282,7 +282,10 @@ def attach_a3_layouts(doc,sheets,project_name="",osm=None):
             [(MAP_LEFT,MAP_BOTTOM),(MAP_RIGHT,MAP_BOTTOM),
              (MAP_RIGHT,MAP_TOP),(MAP_LEFT,MAP_TOP)],
             close=True,dxfattribs={"layer":"NRP_TB_FRAME"})
-        _build_tab(layout,project_name,title,i,len(sheets),osm or {})
+        # Keep paper-frame entities from the original Lemah Abang 2018 drawing.
+        # Both PDF and DXF invoke precisely this drawing function.
+        from original_frame import original_titleblock
+        original_titleblock(layout,project_name,title,i,len(sheets),osm or {})
         # Match A3 map viewport dimensions and fit the entire specified detail.
         xa,ya=webmercator((extent[0],extent[1]))
         xb,yb=webmercator((extent[2],extent[3]))
