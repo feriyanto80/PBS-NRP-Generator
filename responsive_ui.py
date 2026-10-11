@@ -1,4 +1,4 @@
-"""Adaptive desktop shell v1.0.15.
+"""Adaptive desktop shell v1.0.16.
 
 Three-pane desktop, two-pane laptop and single-pane small-screen layouts.
 Independent mousewheel/+/- zoom and mouse-drag pan on map and sheet previews.
@@ -86,11 +86,12 @@ class ResponsiveNRP(DWGAutoMixin, NRPApp):
         self.max_detail_sheets = tk.IntVar(value=24)
         self.sheet_overlap_pct = tk.DoubleVar(value=7.5)
         self.layout_preset = tk.StringVar(value="Normal")
+        self.cad_reference_style = tk.BooleanVar(value=True)
         self.google_download_value = tk.DoubleVar(value=0.0)
         self.google_download_stage = tk.StringVar(value="Google Buildings · menunggu unduhan")
         self.google_download_detail = tk.StringVar(value="Belum ada file yang sedang diunduh")
         self.overall_progress_label = tk.StringVar(value="PROGRES PEKERJAAN · 0%")
-        root.title("PBS Network Route Plan Generator v1.0.15")
+        root.title("PBS Network Route Plan Generator v1.0.16")
         root.configure(bg="#eef2f6")
         sw, sh = root.winfo_screenwidth(), root.winfo_screenheight()
         root.geometry(f"{max(620,min(sw-60,1550))}x{max(470,min(sh-95,920))}")
@@ -105,7 +106,7 @@ class ResponsiveNRP(DWGAutoMixin, NRPApp):
         root=self.root
         header=tk.Frame(root,bg="#164b82",height=53)
         header.pack(fill="x")
-        tk.Label(header,text="PBS  Network Route Plan Generator   v1.0.15",
+        tk.Label(header,text="PBS  Network Route Plan Generator   v1.0.16",
                  bg="#164b82",fg="white",font=("Segoe UI",15,"bold"),
                  anchor="w").pack(side="left",fill="x",expand=True,padx=16,pady=10)
         self.header_steps=tk.Frame(root,bg="#e4edf6")
@@ -340,6 +341,13 @@ class ResponsiveNRP(DWGAutoMixin, NRPApp):
         tk.Label(panel,text="A3 Landscape · Double-Line Frame · Adaptive NRP",
                  bg="white",fg="#536878",font=("Segoe UI",8),
                  wraplength=250,justify="left").pack(fill="x",padx=12,pady=4)
+        tk.Checkbutton(panel,text="Format CAD Referensi Lemah Abang 2018",
+                       variable=self.cad_reference_style,bg="white",
+                       font=("Segoe UI",8,"bold")).pack(fill="x",padx=10,pady=(1,2))
+        tk.Label(panel,text="49 nama layer, simbol block ODP/ODC/T6/T7/T9/TE/OTB, "
+                 "title block bilingual. PDF + CAD memakai satu geometri A3.",
+                 bg="white",fg="#526a7b",wraplength=250,justify="left",
+                 font=("Segoe UI",8)).pack(fill="x",padx=12,pady=(0,5))
         preset_line=tk.Frame(panel,bg="white")
         preset_line.pack(fill="x",padx=12,pady=3)
         tk.Label(preset_line,text="Preset kepadatan:",bg="white",
@@ -964,6 +972,7 @@ class ResponsiveNRP(DWGAutoMixin, NRPApp):
         # Metadata only, never modify the imported KML/Google records.
         self.osm["_project_title"]=os.path.splitext(
             os.path.basename(self.path.get() or "PBS NETWORK ROUTE PLAN"))[0]
+        self.osm["_cad_reference_style"]=bool(self.cad_reference_style.get())
         try:
             # Same layer settings on preview, PDF and DXF.
             base_app.sheets_for=lambda _bbox:list(self._planned_sheets)
