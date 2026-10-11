@@ -29,11 +29,19 @@ jobs:
           python -m pip install -r requirements.txt
           python -m pip install "shapely>=2.0,<3" pypdf
       - name: Validate Python syntax
-        run: python -m py_compile app.py launcher.py kml_support.py osm_acquisition.py engineering_render.py building_sources.py drafter_titleblock.py road_topology.py test_wrapper.py test_osm.py test_engineering.py test_buildings.py test_junctions.py google_auto.py responsive_ui.py footprint_classify.py test_responsive.py test_gui_smoke.py test_footprint_audit.py adaptive_sheets.py test_adaptive_sheets.py google_stream.py test_google_stream.py drawing_settings.py test_ui_controls.py dwg_provider.py dwg_ui.py test_dwg_provider.py cad_sheet_layout.py test_cad_sheets.py reference_cad_profile.py reference_pdf_layout.py test_reference_dxf2018.py
+        run: python -m py_compile app.py launcher.py kml_support.py osm_acquisition.py engineering_render.py building_sources.py drafter_titleblock.py road_topology.py test_wrapper.py test_osm.py test_engineering.py test_buildings.py test_junctions.py google_auto.py responsive_ui.py footprint_classify.py test_responsive.py test_gui_smoke.py test_footprint_audit.py adaptive_sheets.py test_adaptive_sheets.py google_stream.py test_google_stream.py drawing_settings.py test_ui_controls.py dwg_provider.py dwg_ui.py test_dwg_provider.py cad_sheet_layout.py test_cad_sheets.py reference_cad_profile.py reference_pdf_layout.py test_reference_dxf2018.py reference_demo.py
       - name: Run regression suite
         run: python -m unittest -v test_wrapper test_osm test_engineering test_buildings test_junctions test_responsive test_footprint_audit test_adaptive_sheets test_google_stream test_ui_controls test_dwg_provider test_cad_sheets test_reference_dxf2018
       - name: Windows interactive-widget smoke test
         run: python -m unittest -v test_gui_smoke test_adaptive_sheets
+      - name: Generate offline A3 reference PDF and DXF
+        run: python reference_demo.py
+      - name: Upload A3 reference PDF and DXF sample
+        uses: actions/upload-artifact@v4
+        with:
+          name: PBS_NRP_v1.0.16_Reference_A3_Demo
+          path: reference_demo_output/*
+          if-no-files-found: error
       - name: Build portable Windows EXE
         run: pyinstaller --noconfirm --clean --onefile --windowed --name PBS_NRP_Generator responsive_ui.py
       - name: Validate executable
