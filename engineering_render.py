@@ -321,7 +321,7 @@ def draw_dxf(path,lines,points,sheets,osm=None):
     style=(osm or {}).get("_drawing_style",{})
     radius=float(style.get("point_size",2.0))
     labels=bool(style.get("point_labels",True))
-    from drafter_annotations import prepare_points,plan_labels
+    from drafter_annotations import prepare_points,plan_labels,plan_symbols
     prepared=prepare_points(points)
     # Homepass in the source DXF = Tahoma TEXT on the Homepass layer.
     # Place all labels via spatial collisions before writing any entities.
@@ -332,6 +332,12 @@ def draw_dxf(path,lines,points,sheets,osm=None):
                        dxfattribs={"font":"tahoma.ttf"})
     planned=plan_labels(prepared,metric,
                        (-1e12,-1e12,1e12,1e12),size=1.7)
+    display_positions={}
+    for kind,label,anchor,display in plan_symbols(
+            prepared,metric,(-1e12,-1e12,1e12,1e12),radius=1.7*.94):
+        display_positions[(kind,label,round(anchor[0],5),round(anchor[1],5))]=display
+    if "NRP_CALLOUT" not in doc.layers:
+        doc.layers.new("NRP_CALLOUT",dxfattribs={"color":8})
     label_slots={}
     for kind,label,anchor,label_position,fontsize in planned:
         key=(kind,label,round(anchor[0],5),round(anchor[1],5))
@@ -353,12 +359,15 @@ def draw_dxf(path,lines,points,sheets,osm=None):
         if duplicate in seen_devices:
             continue
         seen_devices.add(duplicate)
-        if reference_mode and add_device(doc,m,name,(x,y),
+        px,py=display_positions.get(key,(x,y))
+        if abs(px-x)+abs(py-y)>.03:
+            m.add_line((x,y),(px,py),dxfattribs={"layer":"NRP_CALLOUT"})
+        if reference_mode and add_device(doc,m,name,(px,py),
                                          size=radius,labels=False):
             pass
         else:
             # Non-reference style remains a deliberate optional fallback.
-            m.add_circle((x,y),max(.5,radius/2),
+            m.add_circle((px,py),max(.5,radius/2),
                          dxfattribs={"layer":"POINTS"})
         if labels and text_position:
             m.add_text(label[:64],dxfattribs={
