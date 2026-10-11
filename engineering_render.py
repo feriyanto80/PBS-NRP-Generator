@@ -11,6 +11,7 @@ from reportlab.pdfgen import canvas as pdfcanvas
 from app import COLORS, viewport
 from road_topology import build_road_surfaces, iter_road_boundaries
 from cad_sheet_layout import attach_a3_layouts
+from reference_cad_profile import add_reference_layers, install_symbols, add_device, resolve_reference_line_layer
 
 DEFAULT_ROAD_WIDTH_M = 5.5
 ROAD_COLOR = (0.66, 0.66, 0.66)
@@ -217,7 +218,13 @@ def _draw_titleblock(c, x, y, w, h, title, sheetname, index, count, osm):
 
 
 def draw_pdf(path,lines,points,project,page_w,page_h,title,sheets,osm=None):
-    """A3 sheet-matched engineering PDF with buildings and road corridors."""
+    """Reference CAD 2018 A3 layout, matching the DXF PaperSpace page geometry.
+
+    The same cad_sheet_layout._build_tab() is used by PDF and DXF/DWG layouts.
+    """
+    from reference_pdf_layout import draw_pdf_reference
+    return draw_pdf_reference(path,lines,points,project,page_w,page_h,title,sheets,osm)
+    # Legacy layout code retained below for engineering reference only.
     c=pdfcanvas.Canvas(path,pagesize=(page_w,page_h))
     sidebar=177
     x0,y0=22,21
@@ -284,6 +291,10 @@ def draw_dxf(path,lines,points,sheets,osm=None):
                        ("POINTS",2),("LABELS",7),("OSM_ROAD_EDGES",8),
                        ("OSM_BUILDING_FOOTPRINT",9)]:
         doc.layers.new(name,dxfattribs={"color":color})
+    reference_mode=bool((osm or {}).get("_cad_reference_style",False))
+    if reference_mode:
+        add_reference_layers(doc)
+        install_symbols(doc)
     R=6378137.0
     def metric(pt):
         lon,lat=pt
@@ -293,21 +304,27 @@ def draw_dxf(path,lines,points,sheets,osm=None):
         for geo in osm.get("buildings",[]):
             if len(geo)>=3:
                 m.add_lwpolyline([metric(p) for p in geo],close=True,
-                                 dxfattribs={"layer":"OSM_BUILDING_FOOTPRINT"})
+                                 dxfattribs={"layer":"buildings" if reference_mode else "OSM_BUILDING_FOOTPRINT"})
         # One closed boundary per joined road contour; no double seams at junctions.
         for geo in iter_road_boundaries(osm):
             if len(geo) >= 4:
                 m.add_lwpolyline([metric(p) for p in geo],close=True,
-                                 dxfattribs={"layer":"OSM_ROAD_EDGES"})
+                                 dxfattribs={"layer":"Jalan" if reference_mode else "OSM_ROAD_EDGES"})
     for name,cat,geo in lines:
+        if len(geo)<2:
+            continue
+        route_layer=(resolve_reference_line_layer(name,cat) if reference_mode
+                     else (cat if cat in COLORS else "DISTRIBUSI"))
         m.add_lwpolyline([metric(p) for p in geo],
-                         dxfattribs={"layer":cat if cat in COLORS else "DISTRIBUSI"})
+                         dxfattribs={"layer":route_layer})
     style=(osm or {}).get("_drawing_style",{})
     shape=str(style.get("point_shape","Circle"))
     radius=float(style.get("point_size",2.0))
     labels=bool(style.get("point_labels",True))
     for name,geo in points:
         x,y=metric(geo)
+        if reference_mode and add_device(doc,m,name,(x,y),size=radius,labels=labels):
+            continue
         if shape=="Square":
             vertices=[(x-radius,y-radius),(x+radius,y-radius),
                       (x+radius,y+radius),(x-radius,y+radius)]
