@@ -196,7 +196,8 @@ def draw_pdf_reference(path,lines,points,project,page_w,page_h,title,sheets,osm=
             _pdf_point(c,xy(point),name,style,index)
         c.restoreState()
 
-        _build_tab(paper,title,sheetname,index,len(sheets),osm or {})
+        from original_frame import original_titleblock
+        original_titleblock(paper,title,sheetname,index,len(sheets),osm or {})
         c.restoreState()
         c.showPage()
     c.save()
