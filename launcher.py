@@ -28,7 +28,7 @@ class NRPApp(App):
         self._osm_loading = False
         self._footprint_loading = False
         super().__init__(root)
-        self.root.title("PBS Network Route Plan Generator v1.0.7")
+        self.root.title("PBS Network Route Plan Generator v1.0.10")
         self._rename_labels(root)
         self._insert_source_controls()
         self.status.set("KML/KMZ, OSM dan footprint tambahan siap · v1.0.8")
@@ -37,7 +37,7 @@ class NRPApp(App):
         try:
             current=widget.cget("text")
             if isinstance(current,str):
-                adjusted=current.replace("v1.0.3","v1.0.8").replace("v1.0.4","v1.0.8").replace("v1.0.5","v1.0.8").replace("v1.0.6","v1.0.8").replace("v1.0.7","v1.0.8")
+                adjusted=current.replace("v1.0.3","v1.0.8").replace("v1.0.4","v1.0.8").replace("v1.0.5","v1.0.8").replace("v1.0.6","v1.0.8").replace("v1.0.10","v1.0.8")
                 if "KML/KMZ" not in adjusted:
                     adjusted=adjusted.replace("Import KMZ","Import KML/KMZ").replace("Pilih file KMZ","Pilih file KML/KMZ").replace("geometri KMZ","geometri KML/KMZ")
                 if adjusted != current:
