@@ -154,6 +154,13 @@ def replace_cad_upper_titleblock(doc,layout,source_path):
             imported.append(copy)
         except Exception:
             continue
+    # Copy original CAD linetype tables BEFORE imported entities are added.
+    # Reference 2018 drawings use DASHED2 with exact 6.35/-3.175 pattern.
+    # Without this table entry, DXF entities contain undefined dashed2
+    # references and ODA/ezdxf audits may silently discard their style.
+    for src_linetype in source.linetypes:
+        if src_linetype.dxf.name not in doc.linetypes:
+            doc.linetypes.add_entry(src_linetype.copy())
     for style in source.styles:
         if style.dxf.name not in doc.styles:
             props={"font":style.dxf.font}
