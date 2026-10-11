@@ -89,53 +89,55 @@ def _star_mark(c,center_x,center_y):
 
 
 LEFT_LEGEND = [
-    ("NEW POLE 6","pole",(.85,.75,.0)),
-    ("NEW POLE 7","pole",(.12,.12,.12)),
-    ("NEW POLE 8","pole",(.0,.22,.95)),
-    ("NEW POLE 9","pole",(1,.42,.03)),
-    ("EXISTING POLE","pole",(.31,.31,.31)),
-    ("NEW ODP","odp",(.80,.15,.17)),
-    ("EXISTING ODP","odp",(.45,.45,.45)),
-    ("NEW ODP 8 HP","odp",(.09,.22,.87)),
-    ("NEW ODP 16 HP","odp",(1,.35,.0)),
-    ("NEW ODP 24 HP","odp",(.66,.0,.64)),
-    ("EXISTING ODP","odp",(.2,.2,.2)),
+    ("NEW POLE 6","pole",(.98,.84,.03)),
+    ("NEW POLE 7","pole",(.10,.10,.10)),
+    ("NEW POLE 9","pole",(.03,.17,.98)),
+    ("NEW POLE 6 / TL","pole",(1,.42,.03)),
+    ("EXISTING POLE","pole",(.45,.45,.45)),
+    ("NEW ODC","odp",(.94,.08,.14)),
+    ("EXISTING ODC","odp",(.65,.65,.65)),
+    ("NEW ODP 8 HP","odp",(.08,.24,.96)),
+    ("NEW ODP 16 HP","odp",(1,.35,.06)),
+    ("NEW ODP 24 HP","odp",(.80,.04,.88)),
+    ("EXISTING ODP","odp",(.08,.08,.08)),
 ]
 RIGHT_LEGEND = [
-    ("EXISTING CLOSURE","coil",(.15,.15,.15)),
-    ("NEW CLOSURE","coil",(.91,.10,.13)),
-    ("NEW COIL","coil",(.93,.10,.15)),
-    ("EXISTING COIL","coil",(.14,.14,.14)),
-    ("OUTLET DISTRIBUTION","square",(.10,.22,.95)),
-    ("OTHER MARKER","square",(1,.46,.12)),
-    ("NEW HANDHOLE","square",(.10,.19,.91)),
-    ("EXISTING HANDHOLE","square",(.12,.12,.12)),
-    ("BOUNDARY AREA","stripe",(.96,.14,.15)),
-    ("EXISTING BRIDGE","stripe",(.58,.58,.58)),
-    ("EXISTING HANDHOLE","coil",(.94,.10,.13)),
+    ("EXISTING CLOSURE","coil",(.10,.10,.10)),
+    ("NEW CLOSURE","coil",(.92,.08,.10)),
+    ("NEW COIL","coil",(.95,.10,.18)),
+    ("EXISTING COIL","coil",(.30,.30,.30)),
+    ("OPTIC DISTRIBUTION TERMINAL","square",(.16,.15,.92)),
+    ("OTHER HANDHOLE","square",(1,.38,.06)),
+    ("NEW HANDHOLE","square",(.12,.25,.94)),
+    ("EXISTING HANDHOLE","square",(.16,.16,.16)),
+    ("BORING ALUR","stripe",(.95,.16,.20)),
+    ("CROSSING BRIDGE","stripe",(.52,.52,.52)),
+    ("BORING CROSSING","coil",(.95,.11,.14)),
 ]
 CABLE_LINES = [
-    ("DISTRIBUTION 12C",(.69,.24,.98)),
-    ("JOINTER/24C",(.95,.80,.03)),
-    ("LINE 48C",(.10,.77,.30)),
-    ("UG OPTICAL",(0,.31,.95)),
-    ("ROAD CENTER",(.19,.19,.19)),
-    ("RAILWAY",(.08,.08,.08)),
-    ("DROP LINE",(.96,.12,.71)),
+    ("DROPWIRE 1 CORE",(.76,.35,.95)),
+    ("AERIAL STRAND",(.65,.65,.65)),
+    ("UNDERGROUND STRAND",(.55,.90,.49)),
+    ("UG DROP DUCT",(.25,.35,.99)),
+    ("FEEDER CABLE ROUTE",(.36,.36,.36)),
+    ("RAIL WAY",(.22,.22,.22)),
+    ("SEWER LINE",(.96,.22,.85)),
 ]
 FEEDER_LINES = [
-    ("FDR 12/24",(.96,.10,.14)),
-    ("FDR 24/27",(1,.56,.06)),
-    ("FDR 48/OT",(.12,.22,.95)),
-    ("FDR 72/OT",(.92,.11,.73)),
-    ("FDR 96/OT",(.95,.13,.18)),
-    ("FDR 144/OT",(.0,.82,.24)),
-    ("FDR 288/OT",(.42,.42,.42)),
+    ("FIBER 12/2T",(.99,.12,.12)),
+    ("FIBER 24/2T",(.98,.48,.09)),
+    ("FIBER 48/4T",(.10,.20,.95)),
+    ("FIBER 72/6T",(.96,.10,.81)),
+    ("FIBER 96/8T",(.95,.12,.15)),
+    ("FIBER 144/12T",(.15,.80,.23)),
+    ("FIBER 288/24T",(.52,.52,.52)),
 ]
 
-
 def draw_titleblock(c,x,y,w,h,title,sheetname,index,count,osm):
-    """Engineering legend table and sign-off grids in the exact *section order* of reference."""
+    """A3 technical title block matched in SECTION ORDER and legend vocabulary
+    to the user-supplied Lemah Abang reference. Approval fields are deliberately
+    blank and logo graphic is a vector approximation, not an extracted mark.
+    """
     c.saveState()
     _rect(c,x,y,w,h)
     top=y+h
@@ -231,7 +233,7 @@ def draw_titleblock(c,x,y,w,h,title,sheetname,index,count,osm):
     _line(c,mid,grid_bottom,mid,bottom_grid_top,.5)
     _line(c,x,grid_bottom+grid_h/2,x+w,grid_bottom+grid_h/2,.5)
     roles=[("Prepared by","Survey / Design"),("Checked by","QA / Field Engineer"),
-           ("Approved by","Project Manager"),("Verified by","Starlite / Owner")]
+           ("Approved by","Quality Control"),("Verified by","Owner / Client")]
     for j,role in enumerate(roles):
         col=j%2
         row=j//2
