@@ -121,7 +121,7 @@ def download_tile(url, identifier, directory, size_mb=None, progress=None,
                 if offset and status==206 and not str(content_range).startswith(f"bytes {offset}-"):
                     raise IOError(f"Content-Range tidak cocok: {content_range}")
                 if content_length is not None:
-                    expected=max(expected or 0,offset+int(content_length))
+                    expected=offset+int(content_length)  # HTTP response length overrides manifest estimate
                 _disk_guard(directory,max(0,(expected or (offset+CHUNK_BYTES))-offset))
                 mode="ab" if offset else "wb"
                 with open(part,mode) as output:
@@ -180,6 +180,11 @@ def extract_region(gzip_path,bbox,confidence=.70,progress=None):
                     rows=csv.DictReader(reader)
                     for row in rows:
                         checked+=1
+                        now=time.monotonic()
+                        if now-last_report>=3 and checked%1000==0:
+                            pct=100*min(total_bytes,raw.tell())/max(1,total_bytes)
+                            progress(f"Google Buildings | EXTRACT | {pct:.1f}% file | {checked:,} baris | {len(selected):,} footprint proyek")
+                            last_report=now
                         try:
                             lat=float(row.get("latitude","nan"))
                             lon=float(row.get("longitude","nan"))
@@ -206,11 +211,7 @@ def extract_region(gzip_path,bbox,confidence=.70,progress=None):
                                     selected.append([(float(x),float(y)) for x,y in piece.exterior.coords])
                         except (ValueError,TypeError,AttributeError):
                             continue
-                        now=time.monotonic()
-                        if now-last_report>=3:
-                            pct=100*min(total_bytes,raw.tell())/max(1,total_bytes)
-                            progress(f"Google Buildings | EXTRACT | {pct:.1f}% file | {checked:,} baris | {len(selected):,} footprint proyek")
-                            last_report=now
+
     except (OSError,EOFError,gzip.BadGzipFile) as exc:
         raise IOError(f"Cache Google gzip rusak/tidak lengkap: {exc}") from exc
     progress(f"Google Buildings | EXTRACT DONE | {checked:,} baris diperiksa | {len(selected):,} bangunan dalam boundary")
