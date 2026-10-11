@@ -18,7 +18,7 @@ import urllib.request
 from shapely.geometry import box, shape
 from shapely import wkt
 
-MANIFEST_URL = "https://sites.research.google/open-buildings/tiles.geojson"
+MANIFEST_URL = "https://openbuildings-public-dot-gweb-research.uw.r.appspot.com/public/tiles.geojson"
 TILE_PREFIX = "https://storage.googleapis.com/open-buildings-data/v3/polygons_s2_level_4_gzip/"
 MAX_DOWNLOAD_MB = 80
 MAX_TILES = 2
@@ -47,7 +47,7 @@ def _catalog(cache_dir, opener):
                 return saved
         except (OSError,ValueError,AttributeError):
             pass
-    req=urllib.request.Request(MANIFEST_URL, headers={"User-Agent":"PBS-NRP-Generator/1.0.9"})
+    req=urllib.request.Request(MANIFEST_URL, headers={"User-Agent":"PBS-NRP-Generator/1.0.10"})
     with opener(req, timeout=20) as response:
         raw=response.read(12*1024*1024+1)
     if len(raw)>12*1024*1024:
