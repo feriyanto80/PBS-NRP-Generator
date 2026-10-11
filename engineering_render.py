@@ -439,15 +439,19 @@ def draw_preview(canvas,bb,lines,points,osm,mainmap):
                                width=2 if cat=="FEEDER" else 1)
     # Tk preview follows the exact same semantic categories as the
     # printed legend, PDF map and DXF device blocks.
-    from template_symbols import canonical
+    from drafter_annotations import prepare_points
     style=(osm or {}).get("_drawing_style",{})
     radius=max(1.0,float(style.get("point_size",2.0)))
-    for name,point in points:
+    for name,point,kind,label in prepare_points(points):
         x,y=xy(point)
         if not (-8<x<w+8 and -8<y<h+8):
             continue
-        kind=canonical(name) or "HP"
-        rr=radius*(1.35 if kind!="HP" else .8)
+        if kind=="HP":
+            # Same as AutoCAD source Homepass TEXT: no invented yellow dot.
+            canvas.create_text(x+2,y,text=label,anchor="w",fill="#202020",
+                               font=("Tahoma",max(7,int(radius*3.5))))
+            continue
+        rr=radius*1.35
         if kind in ("T6","T7","T9","TE","TL"):
             color={"T6":"#ffd200","T7":"#111111","T9":"#1431f5",
                    "TE":"#999999","TL":"#ff5c10"}[kind]
