@@ -98,12 +98,11 @@ def original_titleblock(draw,project,sheetname,index,total,stats=None):
     # Starlite logo: reconstructed from original 2018 source PDF outline.
     # The OLD module's seven-point logo was geometrically different.
     # Points below follow the S-shaped central wing, not a generic star.
-    logo=[
-        (1536.5,705.5),(1535.0,670.0),(1575.0,708.5),
-        (1547.0,668.0),(1560.5,636.7),
-        (1531.2,657.3),(1496.5,645.0),
-        (1522.6,675.5),(1536.5,705.5)]
-    poly(logo,layer="NRP_TB_LOGO",color=5)
+    # Two-tone original OLE emblem is supplied as vector contours,
+    # avoiding the broken external OLE link / distorted invented star.
+    from starlite_logo import starlite_logo
+    centre_x, base_y=pt(1535.5,632.0)
+    starlite_logo(draw,centre_x,base_y,height=18.5)
     text("S T A R L I T E",1495.5,625.9,8.0,7)
     line(1413.9,621.5,1655.6,621.5)
 
