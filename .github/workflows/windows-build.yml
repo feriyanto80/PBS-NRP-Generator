@@ -15,7 +15,7 @@ jobs:
         run: |
           tar -xJf PBS_NRP_Source_v1.0.3.tar.xz
           if (!(Test-Path app.py)) { throw "Base app.py missing" }
-          foreach ($name in @("launcher.py","building_sources.py","drafter_titleblock.py","engineering_render.py","road_topology.py","kml_support.py","osm_acquisition.py","google_auto.py","responsive_ui.py","footprint_classify.py")) {
+          foreach ($name in @("launcher.py","building_sources.py","drafter_titleblock.py","engineering_render.py","road_topology.py","kml_support.py","osm_acquisition.py","google_auto.py","responsive_ui.py","footprint_classify.py","adaptive_sheets.py")) {
             if (!(Test-Path $name)) { throw "Required source missing: $name" }
           }
       - name: Setup Python
@@ -29,11 +29,11 @@ jobs:
           python -m pip install -r requirements.txt
           python -m pip install "shapely>=2.0,<3"
       - name: Validate Python syntax
-        run: python -m py_compile app.py launcher.py kml_support.py osm_acquisition.py engineering_render.py building_sources.py drafter_titleblock.py road_topology.py test_wrapper.py test_osm.py test_engineering.py test_buildings.py test_junctions.py google_auto.py responsive_ui.py footprint_classify.py test_responsive.py test_gui_smoke.py test_footprint_audit.py
+        run: python -m py_compile app.py launcher.py kml_support.py osm_acquisition.py engineering_render.py building_sources.py drafter_titleblock.py road_topology.py test_wrapper.py test_osm.py test_engineering.py test_buildings.py test_junctions.py google_auto.py responsive_ui.py footprint_classify.py test_responsive.py test_gui_smoke.py test_footprint_audit.py adaptive_sheets.py test_adaptive_sheets.py
       - name: Run regression suite
         run: python -m unittest -v test_wrapper test_osm test_engineering test_buildings test_junctions test_responsive test_footprint_audit
       - name: Windows interactive-widget smoke test
-        run: python -m unittest -v test_gui_smoke
+        run: python -m unittest -v test_gui_smoke test_adaptive_sheets
       - name: Build portable Windows EXE
         run: pyinstaller --noconfirm --clean --onefile --windowed --name PBS_NRP_Generator responsive_ui.py
       - name: Validate executable
@@ -47,6 +47,6 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: PBS_NRP_Generator_Win64_v1.0.10_Footprint_Audit_Google404_Fix
+          name: PBS_NRP_Generator_Win64_v1.0.11_AdaptiveSheets_DetailedProgress_ExportGuard
           path: dist/PBS_NRP_Generator.exe
           if-no-files-found: error
