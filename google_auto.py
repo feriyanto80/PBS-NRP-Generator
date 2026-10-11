@@ -80,15 +80,29 @@ def _matching_tiles(manifest,bbox):
     return found
 
 
-def _load_tile(url,bbox,opener,confidence,max_bytes,max_count):
-    request=urllib.request.Request(url,headers={"User-Agent":"PBS-NRP-Generator/1.0.9"})
+def _load_tile(url,bbox,opener,confidence,max_bytes,max_count,progress=None):
+    """Bounded streaming HTTP read with byte-level progress and safety checks."""
+    progress=progress or (lambda message:None)
+    request=urllib.request.Request(url,headers={"User-Agent":"PBS-NRP-Generator/1.0.11"})
+    chunks=[]
+    total=0
     with opener(request,timeout=60) as response:
         amount=response.headers.get("Content-Length") if hasattr(response,"headers") else None
         if amount and int(amount)>max_bytes:
-            raise ValueError("Tile Google terlalu besar")
-        raw=response.read(max_bytes+1)
-    if len(raw)>max_bytes:
-        raise ValueError("Tile Google melebihi batas unduh")
+            raise ValueError("Tile Google terlalu besar (header Content-Length)")
+        while total<=max_bytes:
+            block=response.read(min(1024*1024,max_bytes+1-total))
+            if not block:
+                break
+            chunks.append(block)
+            total+=len(block)
+            if total%(4*1024*1024)<len(block) or total>max_bytes:
+                expected=f" / {int(amount)/1048576:.1f} MB" if amount else ""
+                progress(f"Google Buildings | fase 3/4: unduh {total/1048576:.1f} MB{expected} (maksimum {max_bytes/1048576:.0f} MB)")
+    if total>max_bytes:
+        raise ValueError(f"Tile Google melebihi batas unduh aman {max_bytes/1048576:.0f} MB")
+    raw=b"".join(chunks)
+    progress(f"Google Buildings | fase 3/4: file {len(raw)/1048576:.1f} MB diterima; ekstrak footprint")
     polygons=[]
     extent=box(*bbox)
     with gzip.GzipFile(fileobj=io.BytesIO(raw),mode="rb") as gz:
@@ -187,7 +201,7 @@ def acquire_google(bbox, progress=None, cache_dir=None, opener=None,
         progress(f"Google Buildings | fase 3/4: mengunduh tile {index}/{len(selected)}: {ident} (batas {max_download_mb:.0f} MB)")
         try:
             data=(tile_loader(url,bb) if tile_loader else
-                  _load_tile(url,bb,opener,min_confidence,budget,MAX_FOOTPRINTS-len(polygons)))
+                  _load_tile(url,bb,opener,min_confidence,budget,MAX_FOOTPRINTS-len(polygons),progress=progress))
             polygons.extend(data)
         except (ValueError,OSError,urllib.error.URLError) as exc:
             errors.append(f"{ident}: {str(exc)[:100]}")
