@@ -49,8 +49,12 @@ class CadLayoutTests(unittest.TestCase):
             for name in names:
                 self.assertIn(name,doc.layouts)
                 sheet=doc.layouts.get(name)
-                self.assertEqual(len(sheet.query("VIEWPORT")),1)
-                vp=sheet.query("VIEWPORT")[0]
+                # ezdxf creates one default PaperSpace viewport with ID 1.
+                # Exactly ONE additional viewport must display the model network.
+                viewports=[vp for vp in sheet.query("VIEWPORT")
+                           if int(vp.dxf.id)!=1]
+                self.assertEqual(len(viewports),1)
+                vp=viewports[0]
                 self.assertGreater(vp.dxf.height,200)
                 self.assertGreater(vp.dxf.width,300)
                 frame=sheet.query('LWPOLYLINE[layer=="NRP_TB_FRAME"]')
