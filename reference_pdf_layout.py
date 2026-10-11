@@ -40,7 +40,11 @@ class PDFCADAdapter:
         self.c=c
 
     def _color(self, attrs=None):
-        color=(attrs or {}).get("color")
+        attrs=attrs or {}
+        if attrs.get("true_color") is not None:
+            packed=int(attrs["true_color"])
+            return ((packed>>16&255)/255,(packed>>8&255)/255,(packed&255)/255)
+        color=attrs.get("color")
         return cad_rgb(color if color is not None else 7)
 
     def add_line(self,a,b,dxfattribs=None):
@@ -73,6 +77,21 @@ class PDFCADAdapter:
         c.setStrokeColorRGB(*self._color(dxfattribs))
         c.setLineWidth(.25)
         c.circle(center[0],center[1],radius,stroke=1,fill=0)
+        c.restoreState()
+
+    def add_solid(self,points,dxfattribs=None):
+        if len(points)<3:
+            return
+        c=self.c
+        c.saveState()
+        c.setFillColorRGB(*self._color(dxfattribs))
+        c.setStrokeColorRGB(*self._color(dxfattribs))
+        p=c.beginPath()
+        p.moveTo(*points[0][:2])
+        for vertex in points[1:]:
+            p.lineTo(*vertex[:2])
+        p.close()
+        c.drawPath(p,stroke=0,fill=1)
         c.restoreState()
 
     def add_text(self,label,dxfattribs=None):
