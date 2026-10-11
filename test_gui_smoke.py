@@ -1,39 +1,37 @@
-"""Windows GUI smoke tests: verify widgets, responsive states, and zoom controls."""
+"""Windows Tk widgets and simulated desktop/laptop/narrow breakpoint smoke test."""
 import tkinter as tk
 import unittest
 from responsive_ui import ResponsiveNRP
 
+
 class DesktopSmokeTest(unittest.TestCase):
     def test_responsive_relayout_and_controls(self):
-        root=tk.Tk()
+        root = tk.Tk()
         try:
-            app=ResponsiveNRP(root)
-            root.geometry("1470x810")
-            root.update()
-            app._mode=None
-            app._layout()
-            self.assertEqual(app._mode,"wide")
-            self.assertTrue(app.sidebar.winfo_ismapped())
-            self.assertTrue(app.map_panel.winfo_ismapped())
-            self.assertTrue(app.sheet_panel.winfo_ismapped())
-            root.geometry("990x680")
-            root.update()
-            app._mode=None
-            app._layout()
-            self.assertEqual(app._mode,"medium")
-            self.assertTrue(app.sidebar.winfo_ismapped())
-            app.show_panel("sheet")
+            app = ResponsiveNRP(root)
             root.update_idletasks()
-            self.assertTrue(app.sheet_panel.winfo_ismapped())
-            root.geometry("750x600")
-            root.update_idletasks()
-            app._mode=None
-            app._layout()
-            self.assertEqual(app._mode,"small")
-            self.assertFalse(app.header_steps.winfo_ismapped())
-            app.show_panel("settings")
-            root.update_idletasks()
-            self.assertTrue(app.sidebar.winfo_ismapped())
+            # Hosted CI desktops may be only 1024 pixels wide.
+            # Simulate available panel width but exercise REAL Tk grid widgets.
+            for available, expected in ((1450,"wide"),(990,"medium"),(740,"small")):
+                app.body.winfo_width = lambda width=available: width
+                app._mode = None
+                app._layout()
+                root.update_idletasks()
+                self.assertEqual(app._mode,expected)
+                if expected=="wide":
+                    self.assertTrue(app.sidebar.winfo_ismapped())
+                    self.assertTrue(app.map_panel.winfo_ismapped())
+                    self.assertTrue(app.sheet_panel.winfo_ismapped())
+                elif expected=="medium":
+                    app.show_panel("sheet")
+                    root.update_idletasks()
+                    self.assertTrue(app.sidebar.winfo_ismapped())
+                    self.assertTrue(app.sheet_panel.winfo_ismapped())
+                else:
+                    self.assertFalse(app.header_steps.winfo_ismapped())
+                    app.show_panel("settings")
+                    root.update_idletasks()
+                    self.assertTrue(app.sidebar.winfo_ismapped())
             self.assertEqual(app.osm_button.cget("text"),
                              "Ambil / gunakan cache OSM + Google")
             self.assertFalse(hasattr(app,"import_google_button"))
