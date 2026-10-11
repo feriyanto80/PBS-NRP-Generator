@@ -54,7 +54,10 @@ def parse_kml_bytes(source):
         # provide the type to the downstream symbol classifier.
         from template_symbols import canonical
         styled_name=name
-        if role and not canonical(name):
+        own_kind=canonical(name)
+        # A generic HP/numeric label does not override explicit device
+        # authority from Folder or ExtendedData (e.g. ODP/001/HP 008).
+        if role and (not own_kind or (own_kind=="HP" and role!="HP")):
             styled_name=(role+" "+name).strip()
         upper = (name+" "+(role or "")).upper()
         category = ('FEEDER' if 'FEEDER' in upper and 'SUB' not in upper else

@@ -54,6 +54,14 @@ def canonical(name):
     if "CROSSING" in words and "BRIDGE" in words:return "CROSSING_BRIDGE"
     if "HANDHOLE" in words or "HH" in words:
         return "HH_EXIST" if "EXISTING" in words or "EXS" in words else "HH"
+    if (("EXISTING" in words or "EXS" in words or "EKSISTING" in words)
+            and ("POLE" in words or "TIANG" in words)):
+        return "TE"
+    # Real field KMZ labels frequently use "NEW POLE 6", "TIANG 7"
+    # or "POLE-9" rather than the original engineering T6/T7/T9 IDs.
+    match=re.search(r"\b(?:POLE|TIANG)\s+(6|7|9)\b",text)
+    if match:
+        return "T"+match.group(1)
     for kind in ("T6","T7","T9","TE","TL"):
         if kind in words:return kind
     if "EXISTING" in words and ("POLE" in words or "TIANG" in words):return "TE"

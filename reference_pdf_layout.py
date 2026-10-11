@@ -174,7 +174,11 @@ def _pdf_point(c,projected,name,style,sheet_index):
     identifier=canonical(name)
     marker=identifier or "HP"
     s=max(.40,min(1.25,float(style.get("point_size",2.0))*.35))
-    draw_symbol(PDFCADAdapter(c),marker,x,y,size=s)
+    # Identical device glyphs on map and printed reference titleblock.
+    # Reconstructed vector is retained only for missing/invalid references.
+    from reference_pdf_glyphs import draw_reference_pdf_glyph
+    if not draw_reference_pdf_glyph(c,marker,x,y):
+        draw_symbol(PDFCADAdapter(c),marker,x,y,size=s)
     if sheet_index>0 and style.get("point_labels",True) and name:
         c.saveState()
         c.setFillColorRGB(*((.88,.47,.03) if identifier and identifier!="HP"
