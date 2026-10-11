@@ -190,10 +190,17 @@ def replace_cad_upper_titleblock(doc,layout,source_path):
 
 
 def overlay_pdf_upper_titleblock(output_pdf,reference_pdf):
-    """Use source PDF's actual plotted vector glyphs and logo in output.
+    """Copy ONLY exact-looking reference glyph pixels into output PDF.
 
-    Only static upper title/legend/cables/logo region is copied, never
-    old project names, signatures or approvals from lower titleblock.
+    The original AutoCAD PDF is page-rotated 270 degrees. We normalize that,
+    rasterize ONLY the static upper titleblock at 7x PDF resolution (~500dpi),
+    and insert the cropped pixels. DO NOT embed original PDF FormXObjects:
+    clipping full-page vectors visually hides the user's confidential map,
+    historical names and signatures but leaves recoverable source content
+    in the output PDF! Cropped pixel data prevents that disclosure.
+
+    The editable DXF paper-space frame independently imports the original
+    source CAD entities. Only static legend/cables/logo are templated.
     """
     import fitz
     path=Path(output_pdf)
@@ -203,24 +210,31 @@ def overlay_pdf_upper_titleblock(output_pdf,reference_pdf):
         if source.page_count<1:
             raise ValueError("PDF template kosong")
         first=source[0]
-        # Original AutoCAD PDF is landscape via page rotation=270, while
-        # its unrotated MediaBox is portrait. Normalize before vector clipping;
-        # otherwise show_pdf_page silently produces an EMPTY title block.
         if first.rotation:
             first.remove_rotation()
             first=source[0]
         if abs(first.rect.width-1191)>8 or abs(first.rect.height-842)>8:
             raise ValueError("PDF template bukan A3 Landscape")
+        crop=fitz.Rect(993.0,16.0,1158.0,PDF_UPPER_BOTTOM_PT)
+        # A3 reference crop contains no project names or approvals.
+        pixels=first.get_pixmap(matrix=fitz.Matrix(7,7),clip=crop,
+                                colorspace=fitz.csRGB,alpha=False)
+        if pixels.width<500 or pixels.height<1000:
+            raise ValueError("Hasil ekstraksi legenda referensi terlalu kecil")
+        shared_xref=0
         for page in output:
-            template=fitz.Rect(993.0,16.0,1158.0,PDF_UPPER_BOTTOM_PT)
             target=fitz.Rect(
-                template.x0*page.rect.width/first.rect.width,
-                template.y0*page.rect.height/first.rect.height,
-                template.x1*page.rect.width/first.rect.width,
-                template.y1*page.rect.height/first.rect.height)
+                crop.x0*page.rect.width/first.rect.width,
+                crop.y0*page.rect.height/first.rect.height,
+                crop.x1*page.rect.width/first.rect.width,
+                crop.y1*page.rect.height/first.rect.height)
             page.draw_rect(target,color=None,fill=(1,1,1),overlay=True)
-            page.show_pdf_page(target,source,0,clip=template,
-                               keep_proportion=False,overlay=True)
+            if shared_xref:
+                page.insert_image(target,xref=shared_xref,
+                                  keep_proportion=False,overlay=True)
+            else:
+                shared_xref=page.insert_image(target,pixmap=pixels,
+                                              keep_proportion=False,overlay=True)
         dest=path.with_name(path.stem+".template.tmp.pdf")
         output.save(str(dest),garbage=4,deflate=True)
     finally:
