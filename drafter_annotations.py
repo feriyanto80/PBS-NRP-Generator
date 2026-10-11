@@ -30,7 +30,7 @@ def prepare_points(points):
         kind=canonical(name)
         if kind is None and re.fullmatch(r"\s*\d+\s*",str(name or "")):
             kind="HP"
-        if kind in (None,"HP"):
+        if kind=="HP":
             value=re.search(r"(\d+)\s*$",str(name or ""))
             if value:
                 number=int(value.group(1))
@@ -44,6 +44,7 @@ def prepare_points(points):
             kind="HP"
         else:
             label=str(name or kind).strip()
+            kind=kind or "UNKNOWN"
         result.append((name,coord,kind,label))
     return result
 
