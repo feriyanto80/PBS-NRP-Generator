@@ -22,13 +22,19 @@ class AutoGoogleTests(unittest.TestCase):
         self.tmp=tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
 
-    def test_too_large_tile_skips_without_false_footprints(self):
+    def test_large_tile_is_processed_not_skipped(self):
+        building=[(107.01,-6.08),(107.011,-6.08),(107.011,-6.081),(107.01,-6.08)]
+        calls=[]
+        def loader(url,bbox):
+            calls.append(url)
+            return [building]
         result=acquire_google(BBOX,cache_dir=self.tmp.name,
-                              manifest=catalogue(1500),
-                              tile_loader=lambda url,bbox:self.fail("Large tile must not download"))
-        self.assertEqual(result["status"],"skipped_large")
-        self.assertEqual(result["polygons"],[])
-        self.assertFalse(result["complete"])
+                              manifest=catalogue(5880),
+                              tile_loader=loader)
+        self.assertEqual(result["status"],"ready")
+        self.assertEqual(len(result["polygons"]),1)
+        self.assertTrue(result["complete"])
+        self.assertEqual(len(calls),1)
 
     def test_public_small_tile_automatically_merges_and_caches(self):
         building=[(107.01,-6.08),(107.011,-6.08),(107.011,-6.081),(107.01,-6.08)]
