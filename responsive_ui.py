@@ -1,4 +1,4 @@
-"""Adaptive desktop shell v1.0.14.
+"""Adaptive desktop shell v1.0.15.
 
 Three-pane desktop, two-pane laptop and single-pane small-screen layouts.
 Independent mousewheel/+/- zoom and mouse-drag pan on map and sheet previews.
@@ -61,6 +61,8 @@ class ResponsiveNRP(DWGAutoMixin, NRPApp):
         self._sheet_view = None
         self._drag_start = {}
         self._section_targets = {}
+        self._section_panels = {}
+        self._section_buttons = []
         self.lines = []
         self.points = []
         self.osm = None
@@ -88,7 +90,7 @@ class ResponsiveNRP(DWGAutoMixin, NRPApp):
         self.google_download_stage = tk.StringVar(value="Google Buildings · menunggu unduhan")
         self.google_download_detail = tk.StringVar(value="Belum ada file yang sedang diunduh")
         self.overall_progress_label = tk.StringVar(value="PROGRES PEKERJAAN · 0%")
-        root.title("PBS Network Route Plan Generator v1.0.14")
+        root.title("PBS Network Route Plan Generator v1.0.15")
         root.configure(bg="#eef2f6")
         sw, sh = root.winfo_screenwidth(), root.winfo_screenheight()
         root.geometry(f"{max(620,min(sw-60,1550))}x{max(470,min(sh-95,920))}")
@@ -103,7 +105,7 @@ class ResponsiveNRP(DWGAutoMixin, NRPApp):
         root=self.root
         header=tk.Frame(root,bg="#164b82",height=53)
         header.pack(fill="x")
-        tk.Label(header,text="PBS  Network Route Plan Generator   v1.0.14",
+        tk.Label(header,text="PBS  Network Route Plan Generator   v1.0.15",
                  bg="#164b82",fg="white",font=("Segoe UI",15,"bold"),
                  anchor="w").pack(side="left",fill="x",expand=True,padx=16,pady=10)
         self.header_steps=tk.Frame(root,bg="#e4edf6")
@@ -165,17 +167,73 @@ class ResponsiveNRP(DWGAutoMixin, NRPApp):
                  fg="#32495b",font=("Segoe UI",9)).pack(fill="x",padx=9,pady=3)
 
     def _section(self,area,title):
-        label=tk.Label(area,text=title,bg="#e7edf5",fg="#173957",anchor="w",
-                       padx=10,pady=7,font=("Segoe UI",9,"bold"))
-        label.pack(fill="x",pady=(8,0))
+        """Every section is independently collapsible while its header stays visible."""
         number=title.split(".",1)[0].strip()
+        heading=tk.StringVar(value="▾  "+title)
+        label=tk.Button(
+            area,textvariable=heading,bg="#e7edf5",fg="#173957",
+            activebackground="#d1e2f3",activeforeground="#173957",
+            relief="flat",bd=0,anchor="w",cursor="hand2",
+            padx=9,pady=7,font=("Segoe UI",9,"bold"),
+            command=lambda number=number:self._toggle_section(number))
+        label.pack(fill="x",pady=(8,0))
         if number.isdigit():
             self._section_targets[number]=label
+            self._section_buttons.append((number,label,heading,title))
         return label
+
+    def _init_collapsible_sections(self):
+        """Record child widget packing so restore never reorders unrelated sections."""
+        siblings=self.left_content.winfo_children()
+        for number,label,heading,title in self._section_buttons:
+            start=siblings.index(label)
+            following=None
+            for other_number,other_label,_,_ in self._section_buttons:
+                if siblings.index(other_label)>start:
+                    following=other_label
+                    break
+            end=siblings.index(following) if following else len(siblings)
+            contents=[]
+            for widget in siblings[start+1:end]:
+                options=dict(widget.pack_info())
+                options.pop("in",None)
+                contents.append((widget,options))
+            self._section_panels[number]={
+                "header":label,"caption":heading,"title":title,
+                "widgets":contents,"next":following,"expanded":True
+            }
+
+    def _set_section_expanded(self,number,expanded):
+        item=self._section_panels.get(str(number))
+        if item is None or item["expanded"]==bool(expanded):
+            return
+        if not expanded:
+            for widget,_ in item["widgets"]:
+                widget.pack_forget()
+        else:
+            for widget,options in item["widgets"]:
+                args=dict(options)
+                if item["next"] is not None:
+                    args["before"]=item["next"]
+                widget.pack(**args)
+        item["expanded"]=bool(expanded)
+        item["caption"].set(("▾  " if expanded else "▸  ")+item["title"])
+        self.root.update_idletasks()
+        self.sidebar_scroll.configure(scrollregion=self.sidebar_scroll.bbox("all"))
+
+    def _toggle_section(self,number):
+        item=self._section_panels.get(str(number))
+        if item:
+            self._set_section_expanded(number,not item["expanded"])
+
+    def _set_all_sections(self,expanded):
+        for number,_,_,_ in self._section_buttons:
+            self._set_section_expanded(number,expanded)
 
     def _jump_to_section(self,section):
         if self._mode=="small":
             self.show_panel("settings")
+        self._set_section_expanded(section,True)
         target=self._section_targets.get(section)
         if not target:
             return
@@ -200,6 +258,14 @@ class ResponsiveNRP(DWGAutoMixin, NRPApp):
         self.sidebar_scroll.bind("<Configure>",lambda e:self.sidebar_scroll.itemconfigure(handle,width=e.width))
         panel.bind("<Configure>",lambda e:self.sidebar_scroll.configure(scrollregion=self.sidebar_scroll.bbox("all")))
         self.left_content=panel
+        controls=tk.Frame(panel,bg="white")
+        controls.pack(fill="x",padx=9,pady=(6,0))
+        tk.Button(controls,text="▸ Collapse All",
+                  command=lambda:self._set_all_sections(False),
+                  font=("Segoe UI",8),bg="#f0f5fa").pack(side="left",fill="x",expand=True,padx=(0,3))
+        tk.Button(controls,text="▾ Expand All",
+                  command=lambda:self._set_all_sections(True),
+                  font=("Segoe UI",8),bg="#f0f5fa").pack(side="left",fill="x",expand=True,padx=(3,0))
         self._section(panel,"1. Import KML/KMZ")
         tk.Button(panel,text="Pilih file KML/KMZ...",command=self.open_kmz).pack(fill="x",padx=12,pady=6)
         tk.Label(panel,textvariable=self.path,wraplength=255,bg="white",
@@ -316,6 +382,7 @@ class ResponsiveNRP(DWGAutoMixin, NRPApp):
                  "Geser peta: drag mouse. Fit: tampilkan seluruh area.",
                  bg="white",fg="#627281",wraplength=245,
                  justify="left",font=("Segoe UI",8)).pack(fill="x",padx=12,pady=7)
+        self._init_collapsible_sections()
 
     def _preset_changed(self,event=None):
         choices={"Ringkas":(420,520),"Normal":(230,300),"Detail":(110,160)}
