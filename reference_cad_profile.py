@@ -121,6 +121,10 @@ def install_symbols(doc):
     ):
         if style not in doc.styles:
             doc.styles.new(style,dxfattribs={"font":font})
+    # Import the ACTUAL native 2018 DXF HATCH/LWPOLYLINE/MTEXT blocks
+    # before building any fallback symbols. Never trace/reconstruct these.
+    from original_dxf_blocks import import_original_blocks
+    import_original_blocks(doc)
     kinds=set(SYMBOL_NAMES)|set(LEGEND_IDS_LEFT)|set(LEGEND_IDS_RIGHT)
     for kind in sorted(kinds):
         if kind in doc.blocks:
@@ -135,6 +139,9 @@ def add_device(doc,model,name,xy,size=2.0,labels=True):
     if kind is None:
         return False
     size=max(0.45,min(2.6,float(size)/2))
+    from original_dxf_blocks import insert_original
+    if insert_original(doc,model,kind,xy):
+        return True
     model.add_blockref(kind,xy,dxfattribs={
         "layer":symbol_layer(kind),
         "xscale":size,"yscale":size})

@@ -1,4 +1,4 @@
-"""Adaptive desktop shell v1.0.19.
+"""Adaptive desktop shell v1.0.20.
 
 Three-pane desktop, two-pane laptop and single-pane small-screen layouts.
 Independent mousewheel/+/- zoom and mouse-drag pan on map and sheet previews.
@@ -93,10 +93,12 @@ class ResponsiveNRP(DWGAutoMixin, NRPApp):
         self.google_download_stage = tk.StringVar(value="Google Buildings · menunggu unduhan")
         self.google_download_detail = tk.StringVar(value="Belum ada file yang sedang diunduh")
         self.overall_progress_label = tk.StringVar(value="PROGRES PEKERJAAN · 0%")
-        root.title("PBS Network Route Plan Generator v1.0.19")
+        root.title("PBS Network Route Plan Generator v1.0.20")
         root.configure(bg="#eef2f6")
         sw, sh = root.winfo_screenwidth(), root.winfo_screenheight()
-        root.geometry(f"{max(620,min(sw-60,1550))}x{max(470,min(sh-95,920))}")
+        dw=max(620,min(sw-60,1550))
+        dh=max(470,min(sh-95,920))
+        root.geometry(f"{dw}x{dh}+{max(0,(sw-dw)//2)}+{max(0,(sh-dh)//2)}")
         root.minsize(620,470)
         self._make_widgets()
         root.bind("<Configure>",self._root_resize)
@@ -108,7 +110,7 @@ class ResponsiveNRP(DWGAutoMixin, NRPApp):
         root=self.root
         header=tk.Frame(root,bg="#164b82",height=53)
         header.pack(fill="x")
-        tk.Label(header,text="PBS  Network Route Plan Generator   v1.0.19",
+        tk.Label(header,text="PBS  Network Route Plan Generator   v1.0.20",
                  bg="#164b82",fg="white",font=("Segoe UI",15,"bold"),
                  anchor="w").pack(side="left",fill="x",expand=True,padx=16,pady=10)
         self.header_steps=tk.Frame(root,bg="#e4edf6")

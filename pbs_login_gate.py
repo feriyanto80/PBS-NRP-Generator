@@ -1,4 +1,4 @@
-"""PBS NRP v1.0.17 login gate. No UI or exports before server authorization.
+"""PBS NRP v1.0.20 login gate. No UI or exports before server authorization.
 
 Derived from supplied Pole40 native PBS ID source protocol, not from HTML
 scraping. Session validated online before app starts and every 10 minutes.
@@ -37,7 +37,12 @@ class LoginGate:
                 pass
         window=tk.Toplevel(self.root)
         window.title("PBS NRP Generator | PBS Central ID")
-        window.geometry("520x420")
+        # Center over the primary desktop work area (also for laptops/DPI).
+        login_w,login_h=520,420
+        screen_w,screen_h=window.winfo_screenwidth(),window.winfo_screenheight()
+        left=max(0,(screen_w-login_w)//2)
+        top=max(0,(screen_h-login_h)//2)
+        window.geometry(f"{login_w}x{login_h}+{left}+{top}")
         window.resizable(False,False)
         window.protocol("WM_DELETE_WINDOW",self.root.destroy)
         window.configure(bg="#f0f5fa")
@@ -135,8 +140,24 @@ class LoginGate:
         if self.app is None:
             self.app=self.app_type(self.root)
         self.root.deiconify()
+        # Windows 'zoomed' is true OS maximize (not a guessed geometry).
+        # Defer until the responsive widgets finish receiving Configure events.
+        self.root.after_idle(self._maximize_main)
         self._install_logout()
         self._schedule_validation()
+
+    def _maximize_main(self):
+        try:
+            self.root.state("zoomed")
+        except tk.TclError:
+            try:
+                self.root.attributes("-zoomed",True)
+            except tk.TclError:
+                # Non-Windows Tk: retain usable, centered non-maximized frame.
+                self.root.update_idletasks()
+                w,h=self.root.winfo_width(),self.root.winfo_height()
+                sw,sh=self.root.winfo_screenwidth(),self.root.winfo_screenheight()
+                self.root.geometry(f"{w}x{h}+{max(0,(sw-w)//2)}+{max(0,(sh-h)//2)}")
 
     def _install_logout(self):
         if getattr(self.app,"pbs_auth_bar",None) is not None:
