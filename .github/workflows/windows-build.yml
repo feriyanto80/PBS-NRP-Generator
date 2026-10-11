@@ -18,6 +18,8 @@ jobs:
           if (!(Test-Path launcher.py)) { throw "Dual-format launcher missing" }
           if (!(Test-Path osm_acquisition.py)) { throw "OSM recovery engine missing" }
           if (!(Test-Path engineering_render.py)) { throw "Engineering drawing renderer missing" }
+          if (!(Test-Path building_sources.py)) { throw "Footprint sources missing" }
+          if (!(Test-Path drafter_titleblock.py)) { throw "Drafter titleblock missing" }
       - name: Setup Python 3.11
         uses: actions/setup-python@v5
         with:
@@ -28,10 +30,11 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r requirements.txt
           python -m pip install "shapely>=2.0,<3"
+          python -m pip install "shapely>=2.0,<3"
       - name: Syntax check
-        run: python -m py_compile app.py kml_support.py osm_acquisition.py launcher.py test_osm.py test_wrapper.py engineering_render.py test_engineering.py building_sources.py drafter_titleblock.py test_buildings.py
+        run: python -m py_compile app.py kml_support.py osm_acquisition.py launcher.py test_osm.py test_wrapper.py engineering_render.py test_engineering.py building_sources.py drafter_titleblock.py test_buildings.py building_sources.py drafter_titleblock.py test_buildings.py
       - name: Regression tests KML/KMZ and OSM recovery
-        run: python -m unittest -v test_wrapper test_osm test_engineering test_buildings
+        run: python -m unittest -v test_wrapper test_osm test_engineering test_buildings test_buildings
       - name: Build PBS NRP Generator v1.0.7 EXE
         run: pyinstaller --noconfirm --clean --onefile --windowed --name PBS_NRP_Generator launcher.py
       - name: Verify Windows executable
