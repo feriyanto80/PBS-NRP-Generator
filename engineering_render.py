@@ -428,8 +428,10 @@ def draw_preview(canvas,bb,lines,points,osm,mainmap):
                                   x+rr,y+rr,fill="white",outline=ink,width=1.1)
         elif kind.startswith("CLOSURE"):
             ink="#ef1922" if kind=="CLOSURE" else "#111111"
-            canvas.create_line(x-rr,y-rr,x+rr,y+rr,fill=ink,width=1.2)
-            canvas.create_line(x-rr,y+rr,x+rr,y-rr,fill=ink,width=1.2)
+            canvas.create_polygon(x-rr,y-rr*.7,x-rr,y+rr*.7,
+                                  x,y,fill=ink,outline=ink)
+            canvas.create_polygon(x+rr,y-rr*.7,x+rr,y+rr*.7,
+                                  x,y,fill=ink,outline=ink)
         elif kind in ("OTB","ODT","HH","HH_EXIST","HH_OTHER"):
             ink=("#1431f5" if kind in ("OTB","ODT","HH") else
                  "#ff5c10" if kind=="HH_OTHER" else "#111")
