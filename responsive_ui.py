@@ -1,4 +1,4 @@
-"""Adaptive desktop shell v1.0.13.
+"""Adaptive desktop shell v1.0.14.
 
 Three-pane desktop, two-pane laptop and single-pane small-screen layouts.
 Independent mousewheel/+/- zoom and mouse-drag pan on map and sheet previews.
@@ -20,9 +20,10 @@ from osm_acquisition import fetch_osm
 from google_auto import acquire_google
 from google_stream import default_cache
 from drawing_settings import apply_presentation
+from dwg_ui import DWGAutoMixin
 
 
-class ResponsiveNRP(NRPApp):
+class ResponsiveNRP(DWGAutoMixin, NRPApp):
     def __init__(self, root):
         # Bypass inherited fixed-size App.__init__. Retain all import/export,
         # engineering preview, dedupe and titleblock functionality from NRPApp.
@@ -67,6 +68,7 @@ class ResponsiveNRP(NRPApp):
         self.path = tk.StringVar()
         self.converter = tk.StringVar()
         self.want_dwg = tk.BooleanVar()
+        self.initialize_dwg_support()
         self.status = tk.StringVar(value="Import KML/KMZ untuk memulai")
         self.extra_counts = tk.StringVar(value="OSM 0 · KML 0 · Google 0")
         self.plan_label = tk.StringVar(value="Auto-layout: menunggu proyek")
@@ -86,7 +88,7 @@ class ResponsiveNRP(NRPApp):
         self.google_download_stage = tk.StringVar(value="Google Buildings · menunggu unduhan")
         self.google_download_detail = tk.StringVar(value="Belum ada file yang sedang diunduh")
         self.overall_progress_label = tk.StringVar(value="PROGRES PEKERJAAN · 0%")
-        root.title("PBS Network Route Plan Generator v1.0.13")
+        root.title("PBS Network Route Plan Generator v1.0.14")
         root.configure(bg="#eef2f6")
         sw, sh = root.winfo_screenwidth(), root.winfo_screenheight()
         root.geometry(f"{max(620,min(sw-60,1550))}x{max(470,min(sh-95,920))}")
@@ -101,7 +103,7 @@ class ResponsiveNRP(NRPApp):
         root=self.root
         header=tk.Frame(root,bg="#164b82",height=53)
         header.pack(fill="x")
-        tk.Label(header,text="PBS  Network Route Plan Generator   v1.0.13",
+        tk.Label(header,text="PBS  Network Route Plan Generator   v1.0.14",
                  bg="#164b82",fg="white",font=("Segoe UI",15,"bold"),
                  anchor="w").pack(side="left",fill="x",expand=True,padx=16,pady=10)
         self.header_steps=tk.Frame(root,bg="#e4edf6")
@@ -305,10 +307,7 @@ class ResponsiveNRP(NRPApp):
                  justify="left",bg="white",fg="#1c5279",
                  font=("Segoe UI",8,"bold")).pack(fill="x",padx=12,pady=(0,9))
         self._section(panel,"5. Export")
-        tk.Button(panel,text="Pilih ODA File Converter (opsional)",
-                  command=self.pick_oda).pack(fill="x",padx=12,pady=7)
-        tk.Checkbutton(panel,text="Konversi DWG (butuh ODA)",
-                       variable=self.want_dwg,bg="white").pack(anchor="w",padx=8)
+        self.build_dwg_controls(panel)
         self.generate_button=tk.Button(panel,text="▶ Generate PDF + DXF (+ DWG)",
                   bg="#17813e",fg="white",font=("Segoe UI",10,"bold"),
                   command=self.export)
@@ -887,6 +886,9 @@ class ResponsiveNRP(NRPApp):
             messagebox.showwarning("Export terkunci",
                 "Tunggu akuisisi OSM/Google dan perhitungan sheet selesai.")
             return
+        proceed,restore_dwg=self.dwg_preflight()
+        if not proceed:
+            return
         if not self._planned_sheets and (self.lines or self.points):
             self._rebuild_sheet_plan()
         old_sheets=base_app.sheets_for
@@ -899,6 +901,8 @@ class ResponsiveNRP(NRPApp):
         finally:
             base_app.sheets_for=old_sheets
             self.lines,self.points,self.osm=original
+            if restore_dwg:
+                self.want_dwg.set(True)
 
 
 if __name__=="__main__":
