@@ -1,4 +1,4 @@
-"""Adaptive desktop shell v1.0.9.
+"""Adaptive desktop shell v1.0.10.
 
 Three-pane desktop, two-pane laptop and single-pane small-screen layouts.
 Independent mousewheel/+/- zoom and mouse-drag pan on map and sheet previews.
@@ -28,6 +28,7 @@ class ResponsiveNRP(NRPApp):
         self._osm_loading = False
         self._footprint_loading = False
         self._google_status = "Belum diambil"
+        self._kml_audit = {}
         self._mode = None
         self._active_panel = "map"
         self._layout_pending = None
@@ -44,7 +45,7 @@ class ResponsiveNRP(NRPApp):
         self.want_dwg = tk.BooleanVar()
         self.status = tk.StringVar(value="Import KML/KMZ untuk memulai")
         self.extra_counts = tk.StringVar(value="OSM 0 · KML 0 · Google 0")
-        root.title("PBS Network Route Plan Generator v1.0.9")
+        root.title("PBS Network Route Plan Generator v1.0.10")
         root.configure(bg="#eef2f6")
         sw, sh = root.winfo_screenwidth(), root.winfo_screenheight()
         root.geometry(f"{max(620,min(sw-60,1550))}x{max(470,min(sh-95,920))}")
@@ -53,13 +54,13 @@ class ResponsiveNRP(NRPApp):
         root.bind("<Configure>",self._root_resize)
         root.bind_all("<MouseWheel>",self._route_scroll,add="+")
         self._layout()
-        self.status.set("OSM + Google: akuisisi melalui satu tombol. Google tile besar dilewati dengan aman.")
+        self.status.set("KML polygon bukan otomatis bangunan · OSM + Google Open Buildings siap.")
 
     def _make_widgets(self):
         root=self.root
         header=tk.Frame(root,bg="#164b82",height=53)
         header.pack(fill="x")
-        tk.Label(header,text="PBS  Network Route Plan Generator   v1.0.9",
+        tk.Label(header,text="PBS  Network Route Plan Generator   v1.0.10",
                  bg="#164b82",fg="white",font=("Segoe UI",15,"bold"),
                  anchor="w").pack(side="left",fill="x",expand=True,padx=16,pady=10)
         self.header_steps=tk.Frame(root,bg="#e4edf6")
@@ -430,7 +431,10 @@ class ResponsiveNRP(NRPApp):
         self._apply_sources()
         roads=len(self.osm.get("roads",[]))
         count=len(self.osm.get("buildings",[]))
-        text=f"OSM {roads:,} jalan · Google {len(self._google_polygons):,} polygon ({self._google_status}) · Total {count:,} bangunan"
+        text=(f"OSM {roads:,} jalan · Bangunan terkonfirmasi: {count:,} "
+              f"(OSM {len((self._raw_osm or {}).get('buildings', [])):,}, "
+              f"KML {len(self._input_polygons):,}, "
+              f"Google {len(self._google_polygons):,} [{self._google_status}])")
         if osm_error:
             text+=" · OSM error: "+osm_error[:75]
         self.status.set(text)
