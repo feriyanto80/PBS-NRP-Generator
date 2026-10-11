@@ -47,7 +47,7 @@ jobs:
       - name: Upload A3 reference PDF and DXF sample
         uses: actions/upload-artifact@v4
         with:
-          name: PBS_NRP_v1.0.22_Full_Exact_Lemahabang_Titleblock_Demo
+          name: PBS_NRP_v1.0.22.1_Vec3_Export_Crash_Fix_Demo
           path: reference_demo_output/*
           if-no-files-found: error
       - name: Build portable Windows EXE
@@ -63,6 +63,6 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: PBS_NRP_Generator_Win64_v1.0.22_ExactCAD_5Sheet_FullFrame
+          name: PBS_NRP_Generator_Win64_v1.0.22.1_Vec3_Export_Crash_Fix
           path: dist/PBS_NRP_Generator.exe
           if-no-files-found: error

@@ -52,6 +52,10 @@ class NativeGeoRegistration(unittest.TestCase):
                 model.add_lwpolyline(
                     [(x-2,y-2),(x+2,y-2),(x+2,y+2),(x-2,y+2)],
                     close=True,dxfattribs={"layer":"Basic Map"})
+            # Regression: actual 2018 Basic Map/Jalan include LINE entities.
+            # ezdxf.acc.vector.Vec3 DOES NOT accept [:2] slices.
+            model.add_line((10,20),(260,145),dxfattribs={"layer":"Basic Map"})
+            model.add_line((22,35),(245,175),dxfattribs={"layer":"Jalan"})
             doc.saveas(dxf)
             _source.cache_clear()
             with patch("exact_template.find_reference",return_value=str(dxf)):
@@ -61,7 +65,9 @@ class NativeGeoRegistration(unittest.TestCase):
                 self.assertLess(registered[2]["median_error_m"],.05)
                 geo=basemap_from_reference(points)
                 self.assertIsNotNone(geo)
-                self.assertGreaterEqual(len(geo["reference_paths"]),150)
+                self.assertEqual(len(geo["reference_paths"]),161)
+                self.assertEqual(len(geo["reference_roads"]),1)
+                self.assertEqual(len(geo["reference_roads"][0]),2)
                 self.assertTrue(geo["_reference_basemap"])
 
     def test_unrelated_project_does_not_use_2018_map(self):
