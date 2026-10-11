@@ -553,7 +553,7 @@ class ResponsiveNRP(NRPApp):
         self.status.set(message)
         add_log=True
         if "| DOWNLOAD |" in message:
-            match=re.search(r"\\(([0-9.]+)%\\)",message)
+            match=re.search(r"\(([0-9.]+)%\)",message)
             if match:
                 bucket=int(float(match.group(1))//5)
                 add_log=bucket!=self._last_download_logged
