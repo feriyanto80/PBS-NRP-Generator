@@ -66,7 +66,7 @@ def _polygon_rings(geom):
 
 
 def _geojson_polygons(data):
-    payload = json.loads(data)
+    payload = json.loads(data) if isinstance(data, (str, bytes)) else data
     features = payload.get("features") if isinstance(payload, dict) else None
     if features is None:
         features = [payload]
