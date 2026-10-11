@@ -232,3 +232,7 @@ def draw_pdf_reference(path,lines,points,project,page_w,page_h,title,sheets,osm=
         c.restoreState()
         c.showPage()
     c.save()
+    from exact_template import find_reference, overlay_pdf_upper_titleblock
+    reference_pdf=find_reference("pdf")
+    if reference_pdf:
+        overlay_pdf_upper_titleblock(path,reference_pdf)
