@@ -309,10 +309,34 @@ def draw_preview(canvas,bb,lines,points,osm,mainmap):
         x,y=tr(p)
         return x,h-y
     if osm:
+        # True polygon footprint when zoom allows it. For sub-pixel buildings,
+        # show a small footprint locator rather than an invisible hairline.
+        # Locators are display-only and are not exported to engineering PDF/DXF.
+        in_view=0
+        displayed=0
         for geo in osm.get("buildings",[]):
-            if len(geo)<3: continue
-            coords=[v for pt in geo for v in xy(pt)]
-            canvas.create_polygon(*coords,fill="#e6ebf0",outline="#858f9c",width=1.0)
+            if len(geo)<3:
+                continue
+            plotted=[xy(pt) for pt in geo]
+            xs=[p[0] for p in plotted]
+            ys=[p[1] for p in plotted]
+            if max(xs)<0 or min(xs)>w or max(ys)<0 or min(ys)>h:
+                continue
+            in_view+=1
+            if max(xs)-min(xs)<1.5 or max(ys)-min(ys)<1.5:
+                cx=(min(xs)+max(xs))/2
+                cy=(min(ys)+max(ys))/2
+                canvas.create_rectangle(cx-1.1,cy-1.1,cx+1.1,cy+1.1,
+                                        fill="#607c95",outline="")
+            else:
+                coords=[v for pt in plotted for v in pt]
+                canvas.create_polygon(*coords,fill="#e1eaf1",
+                                      outline="#627f95",width=1.0)
+            displayed+=1
+        if mainmap:
+            canvas.create_text(14,14,anchor="nw",
+                               text=f"Footprint: {in_view:,} terlihat dari {len(osm.get('buildings',[])):,} terkonfirmasi",
+                               font=("Segoe UI",8,"bold"),fill="#244f70")
         # Preview uses the same polygon topology as PDF and DXF.
         for polygon in build_road_surfaces(osm):
             exterior = [coordinate for pt in polygon["exterior"] for coordinate in xy(pt)]
