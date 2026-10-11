@@ -395,83 +395,205 @@ class ResponsiveNRP(NRPApp):
         except tk.TclError:
             return
 
+    def _record_progress(self, percent, message):
+        """Live Tk progress; percentage tracks completed workflow stages."""
+        percent=max(self._progress_percent,min(100.0,float(percent)))
+        self._progress_percent=percent
+        self.progress_value.set(percent)
+        self.progress_text.set(f"{percent:.0f}% · {message}")
+        self.status.set(message)
+        self.progress_log.insert("end",f"{percent:3.0f}%  {message[:110]}")
+        while self.progress_log.size()>25:
+            self.progress_log.delete(0)
+        self.progress_log.yview_moveto(1.0)
+
+    def _rebuild_sheet_plan(self):
+        if not self.lines and not self.points:
+            self._planned_sheets=[]
+            self._sheet_report={}
+            self.plan_label.set("Auto-layout: menunggu KML/KMZ")
+            return
+        self._planning=True
+        self._update_generate_button()
+        try:
+            bb=bounds(self.lines,self.points)
+            sheets,report=plan_sheets(self.lines,self.points,bb)
+            self._planned_sheets=sheets
+            self._sheet_report=report
+            self.sheet.configure(values=[
+                f"{i+1:02d} - {entry[0]}" for i,entry in enumerate(sheets)
+            ])
+            self.sheet.current(0)
+            self._sheet_view=None
+            self.plan_label.set(
+                f"{len(sheets)} sheet: 1 Overview + {report['details']} Detail\n"
+                f"Network-density planning · overlap 7.5%\n"
+                f"Target 230 titik / 300 ruas per sheet"
+            )
+            self.schedule_draw()
+        finally:
+            self._planning=False
+            self._update_generate_button()
+
+    def _update_generate_button(self):
+        busy=self._running or self._osm_loading or self._footprint_loading or self._planning
+        self.generate_button.configure(
+            state="disabled" if busy else "normal",
+            bg="#8d9aa5" if busy else "#17813e",
+            text=("⏳ Akuisisi berjalan · Export terkunci"
+                  if busy else "▶ Generate PDF + DXF (+ DWG)"))
+
     def open_kmz(self):
+        if self._running or self._osm_loading or self._planning:
+            messagebox.showwarning("Akuisisi berjalan",
+                "Tunggu proses OSM + Google selesai sebelum mengganti proyek.")
+            return
+        previous_revision=self._revision
         super().open_kmz()
+        if self._revision==previous_revision:
+            return
         self._map_view=None
         self._sheet_view=None
         self._google_status="Belum diambil"
         self.google_label.set("Google: menunggu tombol Ambil/cache")
-        self.schedule_draw()
+        self.progress_value.set(0.0)
+        self._progress_percent=0.0
+        self.progress_text.set("Proyek siap: klik Ambil / gunakan cache OSM + Google")
+        self.progress_log.delete(0,"end")
+        self._rebuild_sheet_plan()
+
+    def _stage_percentage(self,message):
+        if message.startswith("OSM tile"):
+            match=re.search(r"tile\s+(\d+)\s*/\s*(\d+)",message)
+            if match:
+                done,total=map(int,match.groups())
+                return 5+58*done/max(total,1)
+            return 10
+        if message.startswith("OSM"):
+            return 8
+        if message.startswith("Google Buildings"):
+            if "fase 1/4" in message:return 66
+            if "fase 2/4" in message:return 70
+            if "tile ditemukan" in message or "batas aman" in message:return 73
+            if "SKIP" in message:return 76
+            if "fase 3/4" in message:return 80
+            if "tile " in message:return 82
+            if "fase 4/4" in message:return 88
+            return 67
+        return 5
+
+    def _progress(self,message,revision):
+        if revision!=self._revision or not self._running:
+            return
+        self._record_progress(self._stage_percentage(message),message)
 
     def load_osm(self):
         if not self.use_osm.get():
-            self.status.set("Aktifkan checkbox OSM jalan & bangunan")
+            self.status.set("Aktifkan checkbox OSM jalan & bangunan dahulu.")
             return
         if not self.lines and not self.points:
-            messagebox.showwarning("OSM + Google","Import file KML/KMZ terlebih dahulu")
+            messagebox.showwarning("OSM + Google",
+                "Import file KML/KMZ terlebih dahulu.")
             return
-        if self._osm_loading or self._footprint_loading:
-            self.status.set("Akuisisi sudah berjalan; progress di status bawah")
+        if self._running or self._footprint_loading or self._planning:
+            self.status.set("Akuisisi sedang berjalan; lihat log progres.")
             return
         revision=self._revision
         bb=bounds(self.lines,self.points)
+        self._running=True
         self._osm_loading=True
+        self._progress_percent=0.0
+        self.progress_log.delete(0,"end")
         self.osm_button.configure(state="disabled",text="Mengambil OSM + Google...")
-        self.status.set("Akuisisi OSM + Google dimulai (cache otomatis)")
+        self._update_generate_button()
+        self._record_progress(1,"Mulai akuisisi: OSM → Google → Merge → Sheet Planning")
 
-        def progress(text):
+        def progress(message):
             try:
-                self.root.after(0,lambda msg=text:self._progress(msg,revision))
+                self.root.after(0,lambda msg=message:self._progress(msg,revision))
             except RuntimeError:
                 pass
 
         def worker():
             osm=None
             osm_error=None
-            google={"polygons":[],"status":"unavailable","reason":"belum diperiksa"}
+            google={"polygons":[],"status":"unavailable","reason":"belum dicoba"}
             try:
+                progress("OSM: memeriksa cache tile dan server cadangan")
                 osm=fetch_osm(bb,progress=progress)
+                progress(f"OSM: {len(osm.get('roads',[]))} jalan, "
+                         f"{len(osm.get('buildings',[]))} bangunan berhasil")
             except Exception as exc:
                 osm_error=str(exc)
-                progress("OSM gagal; mencoba pelengkap Google jika tersedia")
+                progress("OSM: gagal setelah fallback, tetap memeriksa Google")
             try:
                 google=acquire_google(bb,progress=progress)
             except Exception as exc:
                 google={"polygons":[],"status":"unavailable","reason":str(exc)}
-            self.root.after(0,lambda:self._acquisition_done(revision,osm,google,osm_error))
+            try:
+                self.root.after(0,lambda:self._acquisition_done(
+                    revision,osm,google,osm_error))
+            except RuntimeError:
+                pass
         threading.Thread(target=worker,daemon=True).start()
 
     def _acquisition_done(self,revision,osm,google,osm_error):
+        # Mark source workers finished before re-enabling any output action.
+        self._running=False
         self._osm_loading=False
-        self.osm_button.configure(state="normal",text="Ambil / gunakan cache OSM + Google")
+        self.osm_button.configure(state="normal",
+                                  text="Ambil / gunakan cache OSM + Google")
         if revision!=self._revision:
+            self._update_generate_button()
             return
+        self._record_progress(91,"Akuisisi selesai; menggabungkan footprint dan deduplikasi")
         if osm is not None:
             self._raw_osm=osm
         self._google_polygons=google.get("polygons",[])
         self._google_status=google.get("status","unavailable")
         reason=google.get("reason") or ""
-        label=f"Google: {self._google_status}"
-        if reason:
-            label+=" · "+reason[:125]
-        self.google_label.set(label)
+        self.google_label.set(
+            f"Google: {self._google_status} · {reason[:160]}"
+            if reason else f"Google: {self._google_status}"
+        )
         self._apply_sources()
+        self._record_progress(95,"Menghitung jumlah sheet dari kepadatan jaringan")
+        self._rebuild_sheet_plan()
         roads=len(self.osm.get("roads",[]))
-        count=len(self.osm.get("buildings",[]))
-        text=(f"OSM {roads:,} jalan · Bangunan terkonfirmasi: {count:,} "
-              f"(OSM {len((self._raw_osm or {}).get('buildings', [])):,}, "
-              f"KML {len(self._input_polygons):,}, "
-              f"Google {len(self._google_polygons):,} [{self._google_status}])")
+        buildings=len(self.osm.get("buildings",[]))
+        detail=f"{len(self._planned_sheets)} sheet, {roads} jalan, {buildings} bangunan"
+        if self._google_status=="skipped_large":
+            detail+="; Google SKIPPED: tile > batas aman, bukan error proses"
+        elif self._google_status!="ready":
+            detail+=f"; Google {self._google_status}"
         if osm_error:
-            text+=" · OSM error: "+osm_error[:75]
-        self.status.set(text)
-        if not roads and not count:
+            detail+="; OSM gagal: "+osm_error[:75]
+        # 100% is workflow completion, not proof of 100% Google coverage.
+        self._record_progress(100,"Job selesai · "+detail)
+        self._update_generate_button()
+        if not roads and not buildings:
             messagebox.showwarning("Basemap belum lengkap",
-                "Tidak ada jalan atau footprint terambil. Periksa koneksi atau gunakan cache lokal.\n\n"
-                +str(osm_error or reason)[:350])
+                "Job selesai tanpa data jalan/bangunan. Data input KML/KMZ tetap tersedia.\n\n"
+                +str(osm_error or reason)[:350]+
+                "\n\nGenerate diaktifkan kembali; PDF akan memperingatkan jika basemap tidak lengkap.")
+
+    def export(self):
+        if self._running or self._osm_loading or self._footprint_loading or self._planning:
+            messagebox.showwarning("Export terkunci",
+                "Tunggu akuisisi OSM/Google dan perhitungan sheet selesai.")
+            return
+        if not self._planned_sheets and (self.lines or self.points):
+            self._rebuild_sheet_plan()
+        old_sheets=base_app.sheets_for
+        try:
+            # Existing cumulative PDF exporter calls app.sheets_for(bbox).
+            base_app.sheets_for=lambda _bbox:list(self._planned_sheets)
+            super().export()
+        finally:
+            base_app.sheets_for=old_sheets
 
 
-if __name__ == "__main__":
+if __name__=="__main__":
     root=tk.Tk()
     ResponsiveNRP(root)
     root.mainloop()
