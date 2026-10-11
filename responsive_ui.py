@@ -50,6 +50,7 @@ class ResponsiveNRP(NRPApp):
         self._planning = False
         self._running = False
         self._progress_percent = 0.0
+        self._last_download_logged = -1
         self._kml_audit = {}
         self._mode = None
         self._active_panel = "map"
@@ -550,10 +551,19 @@ class ResponsiveNRP(NRPApp):
         self.progress_text.set(f"{percent:.0f}% · {message}")
         self._update_google_download_display(message)
         self.status.set(message)
-        self.progress_log.insert("end",f"{percent:3.0f}%  {message[:110]}")
-        while self.progress_log.size()>25:
-            self.progress_log.delete(0)
-        self.progress_log.yview_moveto(1.0)
+        add_log=True
+        if "| DOWNLOAD |" in message:
+            match=re.search(r"\\(([0-9.]+)%\\)",message)
+            if match:
+                bucket=int(float(match.group(1))//5)
+                add_log=bucket!=self._last_download_logged
+                if add_log:
+                    self._last_download_logged=bucket
+        if add_log:
+            self.progress_log.insert("end",f"{percent:3.0f}%  {message[:150]}")
+            while self.progress_log.size()>35:
+                self.progress_log.delete(0)
+            self.progress_log.yview_moveto(1.0)
 
     def _show_progress_banner(self):
         if not self.progress_banner.winfo_manager():
@@ -747,6 +757,7 @@ class ResponsiveNRP(NRPApp):
         self._running=True
         self._osm_loading=True
         self._progress_percent=0.0
+        self._last_download_logged=-1
         self.progress_log.delete(0,"end")
         self.google_download_value.set(0)
         self.google_download_stage.set("GOOGLE · menunggu OSM selesai")
