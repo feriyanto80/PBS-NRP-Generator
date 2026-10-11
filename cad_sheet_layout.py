@@ -194,19 +194,19 @@ def _build_tab(draw, project, sheetname, index, total, stats):
 
     proj_bottom=revision_bottom-21
     line(x,proj_bottom,x+w,proj_bottom)
-    text("Project Name",x+2,revision_bottom-3.6,1.6)
+    text("Nama Proyek / Project Name",x+2,revision_bottom-3.6,1.42)
     clean_project=str(project or "PBS NETWORK ROUTE PLAN").replace("_"," ")
     # Split very long project name within two editable text rows.
     text(clean_project[:48],x+2,revision_bottom-9,1.55)
     if len(clean_project)>48:
         text(clean_project[48:96],x+2,revision_bottom-13,1.55)
-    text("Drawing Title",x+2,proj_bottom+5.2,1.5)
+    text("Tipe Gambar / Drawing Type",x+2,proj_bottom+5.2,1.42)
     text("AS PLAN DRAWING - "+str(sheetname)[:30],x+2,proj_bottom+1.7,1.5)
 
     sign_bottom=proj_bottom-11
     line(x,sign_bottom,x+w,sign_bottom)
-    text("DRAWING SIGN & CHECK",x+11,proj_bottom-5,2.5)
-    text("Prepared by: __________  Checked by: __________",
+    text("DRAWING SIGN & CHECK",x+8.5,proj_bottom-5,2.35)
+    text("Created by: __________  Checked by: __________",
          x+2,sign_bottom+2.3,1.35)
 
     company_bottom=sign_bottom-9.0
@@ -218,10 +218,10 @@ def _build_tab(draw, project, sheetname, index, total, stats):
     line(mid,approvals_bottom,mid,company_bottom)
     line(x,approvals_bottom+17,x+w,approvals_bottom+17)
     roles=(
-        ("Created by","Survey & Design"),
-        ("Checked by","Project Manager"),
-        ("Approved by","Quality Control"),
-        ("Verified by","Owner / Client"),
+        ("Dibuat Oleh / Created by","Survey & Design"),
+        ("Diperiksa Oleh / Checked by","Project Manager"),
+        ("Disetujui Oleh / Approved by","Quality Control"),
+        ("Diketahui Oleh / Verified by","Owner / Client"),
     )
     for i,(label,role) in enumerate(roles):
         ax=x if i%2==0 else mid
@@ -238,17 +238,17 @@ def _build_tab(draw, project, sheetname, index, total, stats):
     foot_mid=x+w*.49
     line(foot_mid,footer_bottom,foot_mid,footer_top)
     line(foot_mid,footer_bottom+14, x+w,footer_bottom+14)
-    text("REF. PETA / MAP REF.",x+1.5,footer_top-3.5,1.55)
-    text("DIRECTION",x+1.5,footer_top-11,1.3)
+    text("Ref. Peta / Map Ref.",x+1.5,footer_top-3.5,1.55)
+    text("Arah / Direction",x+1.5,footer_top-11,1.3)
     north=(x+16,footer_bottom+10)
     line(north[0],north[1]-6,north[0],north[1]+7,"NRP_TB_COMPASS",7)
     line(north[0]-6,north[1],north[0]+6,north[1],"NRP_TB_COMPASS",7)
     text("N",north[0]-.8,north[1]+8.1,1.9)
     text("S",north[0]-.8,north[1]-9.0,1.9)
-    text("Drawing No.",foot_mid+1.5,footer_top-3.5,1.4)
+    text("No. Gambar / Drawing No.",foot_mid+1.5,footer_top-3.5,1.22)
     text(f"NRP-{index+1:02d}",foot_mid+1.5,footer_top-7,1.8)
-    text("SCALE  N.T.S.",foot_mid+1.5,footer_bottom+9.0,1.75)
-    text(f"SHEET {index+1} OF {total}",foot_mid+1.5,footer_bottom+3.0,1.9)
+    text("Skala / Scale : N.T.S.",foot_mid+1.5,footer_bottom+9.0,1.55)
+    text(f"Halaman / Page : {index+1} OF {total}",foot_mid+1.5,footer_bottom+3.0,1.5)
 
 
 def attach_a3_layouts(doc,sheets,project_name="",osm=None):
