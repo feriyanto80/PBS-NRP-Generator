@@ -12,6 +12,7 @@ This uses PDF reference page 1 only for the upper static A3 titleblock
 region, preserving actual fonts and OLE logo as printed.
 """
 import os
+from functools import lru_cache
 from pathlib import Path
 import sys
 
@@ -95,14 +96,11 @@ def _target_upper_entity(ent):
             bb.extmax.y<294.0)
 
 
-def replace_cad_upper_titleblock(doc,layout,source_path):
-    """Transplant original upper PaperSpace geometry from user DXF.
-
-    Template's original model network is NEVER copied.
-    """
+@lru_cache(maxsize=2)
+def _load_source_cached(path,mtime):
+    """One 8 MB DXF parse per export job, reused for all 19+ A3 sheets."""
     import ezdxf
-    from ezdxf.math import Matrix44
-    source=ezdxf.readfile(source_path)
+    source=ezdxf.readfile(path)
     if source.dxfversion!="AC1032":
         raise ValueError("Template harus DXF 2018 / AC1032")
     if "Layout1-ALL" not in source.layouts:
@@ -114,6 +112,18 @@ def replace_cad_upper_titleblock(doc,layout,source_path):
             selected.append(entity)
     if len(selected)<80:
         raise ValueError("Template tidak memiliki cukup entitas legenda")
+    return source,tuple(selected)
+
+
+def replace_cad_upper_titleblock(doc,layout,source_path):
+    """Transplant original upper PaperSpace geometry from user DXF.
+
+    Template's original model network is NEVER copied.
+    """
+    import ezdxf
+    from ezdxf.math import Matrix44
+    source,selected=_load_source_cached(
+        str(Path(source_path).resolve()),os.path.getmtime(source_path))
     matrix=Matrix44.chain(
         Matrix44.scale(REFERENCE_SCALE,REFERENCE_SCALE,1),
         Matrix44.translate(
