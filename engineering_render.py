@@ -325,6 +325,17 @@ def draw_dxf(path,lines,points,sheets,osm=None):
     # PaperSpace layout and model viewport, convertible to DWG ACAD2018 by ODA.
     project_name=(osm or {}).get("_project_title","PBS NETWORK ROUTE PLAN")
     attach_a3_layouts(doc,sheets,project_name=project_name,osm=osm)
+    # Printable CAD layouts follow the same dynamic sheet list as PDF.
+    # The resulting DXF carries these layouts into licensed ODA DWG conversion.
+    from cad_layout import add_sheet_layouts
+    import os
+    for layer_name,color in [
+        ("SHEET_BORDER",7),("TITLE_BLOCK",7),("CAD_LEGEND",7)
+    ]:
+        if layer_name not in doc.layers:
+            doc.layers.new(layer_name,dxfattribs={"color":color})
+    add_sheet_layouts(doc,lines,points,sheets,osm,
+                      project_title=os.path.splitext(os.path.basename(path))[0])
     doc.saveas(path)
 
 
