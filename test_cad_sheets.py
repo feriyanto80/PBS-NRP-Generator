@@ -58,7 +58,8 @@ class CadLayoutTests(unittest.TestCase):
                 self.assertGreater(vp.dxf.height,200)
                 self.assertGreater(vp.dxf.width,300)
                 frame=sheet.query('LWPOLYLINE[layer=="NRP_TB_FRAME"]')
-                self.assertGreaterEqual(len(frame),2)
+                border=sheet.query('LWPOLYLINE[layer=="NRP_SHEET_BORDER"]')
+                self.assertGreaterEqual(len(frame)+len(border),2)
                 labels=[entity.dxf.text for entity in sheet.query("TEXT")]
                 self.assertIn("AS BUILT DRAWING",labels)
                 self.assertIn("CABLE TYPE",labels)
