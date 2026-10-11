@@ -93,7 +93,10 @@ def _dpapi(data,encrypt=True):
     try:
         return ctypes.string_at(out.pbData,out.cbData)
     finally:
-        ctypes.windll.kernel32.LocalFree(out.pbData)
+        local_free=ctypes.windll.kernel32.LocalFree
+        local_free.argtypes=[ctypes.c_void_p]
+        local_free.restype=ctypes.c_void_p
+        local_free(ctypes.cast(out.pbData,ctypes.c_void_p))
 
 
 def save_session(data):
