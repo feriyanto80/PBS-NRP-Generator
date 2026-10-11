@@ -539,11 +539,12 @@ class ResponsiveNRP(NRPApp):
 
     def _acquisition_done(self,revision,osm,google,osm_error):
         # Mark source workers finished before re-enabling any output action.
-        self._running=False
+        # Keep export disabled until merge and auto-pagination reach 100%.
         self._osm_loading=False
-        self.osm_button.configure(state="normal",
-                                  text="Ambil / gunakan cache OSM + Google")
         if revision!=self._revision:
+            self._running=False
+            self.osm_button.configure(state="normal",
+                                      text="Ambil / gunakan cache OSM + Google")
             self._update_generate_button()
             return
         self._record_progress(91,"Akuisisi selesai; menggabungkan footprint dan deduplikasi")
@@ -570,6 +571,9 @@ class ResponsiveNRP(NRPApp):
             detail+="; OSM gagal: "+osm_error[:75]
         # 100% is workflow completion, not proof of 100% Google coverage.
         self._record_progress(100,"Job selesai · "+detail)
+        self._running=False
+        self.osm_button.configure(state="normal",
+                                  text="Ambil / gunakan cache OSM + Google")
         self._update_generate_button()
         if not roads and not buildings:
             messagebox.showwarning("Basemap belum lengkap",
