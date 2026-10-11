@@ -169,23 +169,56 @@ def sheet_map_transform(extent):
 
 
 def _pdf_point(c,projected,name,style,sheet_index):
-    """Use exactly the same device class/color/shapes as the printed legend."""
-    x,y=projected
-    identifier=canonical(name)
-    marker=identifier or "HP"
-    s=max(.40,min(1.25,float(style.get("point_size",2.0))*.35))
-    # Identical device glyphs on map and printed reference titleblock.
-    # Reconstructed vector is retained only for missing/invalid references.
-    from reference_pdf_glyphs import draw_reference_pdf_glyph
-    if not draw_reference_pdf_glyph(c,marker,x,y):
-        draw_symbol(PDFCADAdapter(c),marker,x,y,size=s)
-    if sheet_index>0 and style.get("point_labels",True) and name:
+    """Compatibility entry point: original HP is numerical TEXT, not a disc."""
+    from drafter_annotations import prepare_points
+    info=prepare_points([(name,projected)])[0]
+    _name,xy,kind,label=info
+    x,y=xy
+    if kind=="HP":
         c.saveState()
-        c.setFillColorRGB(*((.88,.47,.03) if identifier and identifier!="HP"
-                            else (.15,.15,.15)))
-        c.setFont(_system_font(),1.45)
-        c.drawString(x+s+0.35,y+s*.28,str(name)[:38])
+        c.setFillColorRGB(.08,.08,.08)
+        c.setFont(_system_font(),1.35)
+        c.drawString(x+.65,y+.10,label)
         c.restoreState()
+        return
+    from reference_pdf_glyphs import draw_reference_pdf_glyph
+    glyph_kind="ODT" if kind=="OTB" else kind
+    if not draw_reference_pdf_glyph(c,glyph_kind,x,y):
+        draw_symbol(PDFCADAdapter(c),kind,x,y,size=.70)
+
+
+def _pdf_map_annotations(c,points,project,style,viewport):
+    """Layer order and annotation placement follow source CAD drafter logic.
+
+    Native symbol positions remain georeferenced. Homepass draws as 001,002...
+    at *every* sheet level; the PDF never creates a yellow HP circle.
+    A shared deterministic grid prevents labels crossing icons or each other.
+    """
+    from drafter_annotations import prepare_points, plan_labels
+    from reference_pdf_glyphs import draw_reference_pdf_glyph
+    entries=prepare_points(points)
+    xmin,ymin,xmax,ymax=viewport
+    device_centres=set()
+    for original,coord,kind,label in entries:
+        if kind=="HP":continue
+        x,y=project(coord)
+        if not (xmin<=x<=xmax and ymin<=y<=ymax):
+            continue
+        device_centres.add((round(x,3),round(y,3),kind))
+        source_kind="ODT" if kind=="OTB" else kind
+        if not draw_reference_pdf_glyph(c,source_kind,x,y):
+            draw_symbol(PDFCADAdapter(c),kind,x,y,size=.70)
+    placements=plan_labels(entries,project,viewport,size=1.27)
+    for kind,label,anchor,(lx,ly),fs in placements:
+        if kind!="HP" and not style.get("point_labels",True):
+            continue
+        # Source AutoCAD uses Tahoma for Homepass, not filled waypoint marker.
+        c.saveState()
+        c.setFillColorRGB(*((.10,.10,.10) if kind=="HP" else (.93,.55,.03)))
+        c.setFont(_system_font(bold=False),fs)
+        c.drawString(lx,ly,label[:54])
+        c.restoreState()
+
 
 def draw_pdf_reference(path,lines,points,project,page_w,page_h,title,sheets,osm=None):
     """Reference-profile PDF with identical sheet geometry to exported DXF.
@@ -227,8 +260,8 @@ def draw_pdf_reference(path,lines,points,project,page_w,page_h,title,sheets,osm=
             c.setStrokeColor(COLORS.get(category,COLORS["DISTRIBUSI"]))
             c.setLineWidth(.41 if category=="FEEDER" else .22)
             _pdf_path(c,[xy(point) for point in geometry])
-        for name,point in points:
-            _pdf_point(c,xy(point),name,style,index)
+        _pdf_map_annotations(c,points,xy,style,
+                             (MAP_LEFT+1,MAP_BOTTOM+1,MAP_RIGHT-1,MAP_TOP-1))
         c.restoreState()
 
         from original_frame import original_titleblock
