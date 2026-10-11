@@ -11,6 +11,7 @@ is traced from the supplied PDF screenshot, and is editable vector geometry
 in both DXF/DWG and PDF (not a broken OLE link).
 """
 from cad_sheet_layout import LEGEND_LEFT, LEGEND_RIGHT, CABLE_LEFT, CABLE_RIGHT
+from template_symbols import draw_symbol, LEGEND_IDS_LEFT, LEGEND_IDS_RIGHT
 
 REFERENCE_LEFT=1413.9
 REFERENCE_BOTTOM=45.8
@@ -35,9 +36,10 @@ def original_titleblock(draw,project,sheetname,index,total,stats=None):
         draw.add_circle(pt(x,y),r*REFERENCE_SCALE,
                         dxfattribs={"layer":"NRP_TB_SYMBOL","color":color})
     def text(value,x,y,h=6,color=7,layer="NRP_TB_TEXT"):
+        style=("NRP_REFERENCE_TAHOMA" if h>=8 else "NRP_REFERENCE_ROMANS")
         draw.add_text(str(value or "")[:85],dxfattribs={
             "layer":layer,"color":color,"height":h*REFERENCE_SCALE,
-            "insert":pt(x,y)})
+            "insert":pt(x,y),"style":style})
 
     # Paper-frame and titleblock coordinates are from source DXF measurements.
     line(1413.9,45.8,1413.9,1256.1)
@@ -57,28 +59,16 @@ def original_titleblock(draw,project,sheetname,index,total,stats=None):
         line(1413.9,yy,1655.6,yy)
         left=LEGEND_LEFT[row_index]
         right=LEGEND_RIGHT[row_index]
-        for start,entry in ((1413.9,left),(1535.5,right)):
-            label,color,kind,short=entry
+        # The titleblock and map draw from the SAME symbol authority.
+        for start,entry,identifier in (
+            (1413.9,left,LEGEND_IDS_LEFT[row_index]),
+            (1535.5,right,LEGEND_IDS_RIGHT[row_index]),
+        ):
+            label,colour,_kind,_short=entry
             middle=yy+16.1
             sx=start+9.8
-            if kind=="POLE":
-                circle(sx,middle,5.8,color)
-                if short:
-                    text(short,sx-4,middle-2.4,5,7)
-            elif kind=="TRI":
-                poly([(sx-6,middle-4),(sx+6,middle-4),(sx,middle+7)],
-                     color=color,close=True)
-            elif kind=="BOW":
-                poly([(sx-7,middle+4),(sx,middle),(sx-7,middle-4)],color=color)
-                poly([(sx+7,middle+4),(sx,middle),(sx+7,middle-4)],color=color)
-            elif kind=="COIL":
-                circle(sx-3,middle,3.6,color)
-                circle(sx+3,middle,3.6,color)
-            elif kind=="BOX":
-                poly([(sx-6,middle-5),(sx+6,middle-5),
-                      (sx+6,middle+5),(sx-6,middle+5)],color=color,close=True)
-            else:
-                line(sx-7,middle,sx+7,middle,"NRP_TB_SYMBOL",color)
+            gx,gy=pt(sx,middle)
+            draw_symbol(draw,identifier,gx,gy,size=5.8*REFERENCE_SCALE)
             text(label,start+21,yy+13,5.2 if len(label)>21 else 6.0)
 
     line(1413.9,842.6,1655.6,842.6)
