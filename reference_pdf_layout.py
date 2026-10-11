@@ -233,6 +233,6 @@ def draw_pdf_reference(path,lines,points,project,page_w,page_h,title,sheets,osm=
         c.showPage()
     c.save()
     from exact_template import find_reference, overlay_pdf_upper_titleblock
-    reference_pdf=find_reference("pdf")
+    reference_pdf=(find_reference("pdf") if (osm or {}).get("_cad_reference_style",True) else None)
     if reference_pdf:
         overlay_pdf_upper_titleblock(path,reference_pdf)
