@@ -6,7 +6,7 @@ on:
 jobs:
   build-windows:
     runs-on: windows-latest
-    timeout-minutes: 30
+    timeout-minutes: 35
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -15,30 +15,33 @@ jobs:
         run: |
           tar -xJf PBS_NRP_Source_v1.0.3.tar.xz
           if (!(Test-Path app.py)) { throw "Baseline archive missing app.py" }
-          if (!(Test-Path launcher.py)) { throw "Dual format launcher missing" }
+          if (!(Test-Path launcher.py)) { throw "Dual-format launcher missing" }
+          if (!(Test-Path osm_acquisition.py)) { throw "OSM recovery engine missing" }
       - name: Setup Python 3.11
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
           architecture: x64
-      - name: Install dependencies
+      - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
           python -m pip install -r requirements.txt
-      - name: Syntax validation
-        run: python -m py_compile app.py launcher.py kml_support.py test_wrapper.py
-      - name: KML KMZ regression tests
-        run: python -m unittest -v test_wrapper
-      - name: Build Windows executable v1.0.4
+      - name: Syntax check
+        run: python -m py_compile app.py kml_support.py osm_acquisition.py launcher.py test_osm.py test_wrapper.py
+      - name: Regression tests KML/KMZ and OSM recovery
+        run: python -m unittest -v test_wrapper test_osm
+      - name: Build PBS NRP Generator v1.0.5 EXE
         run: pyinstaller --noconfirm --clean --onefile --windowed --name PBS_NRP_Generator launcher.py
-      - name: Verify EXE output
+      - name: Verify Windows executable
         shell: pwsh
         run: |
-          if (!(Test-Path dist/PBS_NRP_Generator.exe)) { throw "EXE missing" }
-          Write-Host "EXE bytes: $((Get-Item dist/PBS_NRP_Generator.exe).Length)"
+          if (!(Test-Path dist/PBS_NRP_Generator.exe)) { throw "EXE artifact missing" }
+          $head = [System.IO.File]::ReadAllBytes("dist/PBS_NRP_Generator.exe")
+          if ($head.Length -lt 1000000 -or $head[0] -ne 77 -or $head[1] -ne 90) { throw "Invalid EXE format" }
+          Write-Host "EXE bytes: $($head.Length)"
       - name: Upload Windows EXE artifact
         uses: actions/upload-artifact@v4
         with:
-          name: PBS_NRP_Generator_Windows_x64_v1.0.4_KML_KMZ
+          name: PBS_NRP_Generator_Windows_x64_v1.0.5_OSM_Recovery
           path: dist/PBS_NRP_Generator.exe
           if-no-files-found: error
