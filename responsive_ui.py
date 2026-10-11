@@ -204,6 +204,11 @@ class ResponsiveNRP(NRPApp):
         if mode==self._mode:
             return
         self._mode=mode
+        if mode=="small":
+            self.header_steps.pack_forget()
+        elif not self.header_steps.winfo_manager():
+            before_widget=(self.quicknav if self.quicknav.winfo_manager() else self.body)
+            self.header_steps.pack(fill="x",before=before_widget)
         for panel in (self.sidebar,self.map_panel,self.sheet_panel):
             panel.grid_forget()
         for col in range(3):
