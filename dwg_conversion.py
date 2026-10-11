@@ -14,10 +14,13 @@ from pathlib import Path
 from dwg_provider import recognized_oda_executable
 
 _DWG_HEADER=b"AC1032"
-_ODAFILTERS=((True,"*.dxf","1"),
-             (True,"*.dxf","0"),
-             (True,"*.DXF","0"),
+# v1.0.21 successfully converted with SIX positional ODA arguments.
+# ODA 27.9.0 may exit 0 while doing nothing when the optional filter
+# argument is present. Try the proven format *first*, unmodified DXF.
+_ODAFILTERS=((False,None,"1"),
              (False,None,"0"),
+             (True,"*.dxf","1"),
+             (True,"*.dxf","0"),
              (True,"*.DWG;*.DXF","0"))
 
 
@@ -143,7 +146,7 @@ def convert_dwg(dxf_path,converter):
     exe=str(Path(converter).resolve())
     target=source.with_suffix(".dwg")
     log=[
-        "PBS NRP Generator · ODA Converter Diagnostic v1.0.22.3",
+        "PBS NRP Generator · ODA Converter Diagnostic v1.0.22.4",
         f"DXF sumber: {source.name}",f"ODA: {exe}",
         f"File tujuan: {target}","Target: DWG AutoCAD 2018 (AC1032)",
         "Note: exit code 0 does NOT guarantee a converted DWG.",
@@ -156,10 +159,18 @@ def convert_dwg(dxf_path,converter):
             out=work/"output"
             inp.mkdir()
             out.mkdir()
-            staged=inp/"PBS_NRP_CONVERT.dxf"
-            _sanitize_dxf(source,staged,log)
+            # Restore v1.0.21 staging: preserve the exact source DXF
+            # filename and bytes for the first two six-argument CLI calls.
+            staged=inp/source.name
+            shutil.copy2(source,staged)
+            log.append("Input DXF unmodified (v1.0.21 compatibility): "+
+                       staged.name)
             log.append("Input listing: "+", ".join(p.name for p in inp.iterdir()))
             for iteration,(has_filter,filter_value,audit) in enumerate(_ODAFILTERS,1):
+                if iteration==3:
+                    # Only alter a staging copy for experimental fallbacks,
+                    # never the original successful v1.0.21 path.
+                    _sanitize_dxf(source,staged,log)
                 cmd=[exe,str(inp),str(out),"ACAD2018","DWG","0",audit]
                 if has_filter:
                     cmd.append(filter_value)
