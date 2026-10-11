@@ -38,7 +38,7 @@ def _explicit_building(placemark):
                if _name(x.tag)=="name"),"")
     has_tag=False
     for key,value in _values(placemark):
-        if key in ("building","building:part","building_type","landuse") and value in (
+        if key in ("building","building:part","building_type") and value in (
             "yes","house","residential","commercial","industrial","apartments",
             "detached","semidetached_house","roof","building","buildings"):
             has_tag=True
