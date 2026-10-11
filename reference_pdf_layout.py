@@ -187,7 +187,7 @@ def _pdf_point(c,projected,name,style,sheet_index):
         draw_symbol(PDFCADAdapter(c),kind,x,y,size=.70)
 
 
-def _pdf_map_annotations(c,points,project,style,viewport):
+def _pdf_map_annotations(c,points,project,style,viewport,sheet_index=0,source_mode=False):
     """Layer order and annotation placement follow source CAD drafter logic.
 
     Native symbol positions remain georeferenced. Homepass draws as 001,002...
@@ -210,7 +210,10 @@ def _pdf_map_annotations(c,points,project,style,viewport):
         source_kind="ODT" if kind=="OTB" else kind
         if not draw_reference_pdf_glyph(c,source_kind,render_x,render_y):
             draw_symbol(PDFCADAdapter(c),kind,render_x,render_y,size=.70)
-    placements=plan_labels(entries,project,viewport,size=1.27)
+    # Lemahabang original HP text: overview approx 2.2pt, detail 4-6pt.
+    # v1.0.20 incorrectly printed every HP at approx 3.4pt.
+    label_size=(.79 if sheet_index==0 else 1.67) if source_mode else 1.27
+    placements=plan_labels(entries,project,viewport,size=label_size)
     for kind,label,anchor,(lx,ly),fs in placements:
         if kind!="HP" and not style.get("point_labels",True):
             continue
@@ -232,6 +235,9 @@ def draw_pdf_reference(path,lines,points,project,page_w,page_h,title,sheets,osm=
     # ReportLab has points; CAD design uses fixed A3 paper in millimetres.
     scalex=page_w/A3_W_MM
     scaley=page_h/A3_H_MM
+    if (osm or {}).get("_cad_reference_style",False):
+        from reference_basemap import apply_reference_basemap
+        osm=apply_reference_basemap(osm,points)
     style=(osm or {}).get("_drawing_style",{})
     for index,(sheetname,extent) in enumerate(sheets):
         c.saveState()
@@ -263,7 +269,9 @@ def draw_pdf_reference(path,lines,points,project,page_w,page_h,title,sheets,osm=
             c.setLineWidth(.41 if category=="FEEDER" else .22)
             _pdf_path(c,[xy(point) for point in geometry])
         _pdf_map_annotations(c,points,xy,style,
-                             (MAP_LEFT+1,MAP_BOTTOM+1,MAP_RIGHT-1,MAP_TOP-1))
+                             (MAP_LEFT+1,MAP_BOTTOM+1,MAP_RIGHT-1,MAP_TOP-1),
+                             sheet_index=index,
+                             source_mode=bool((osm or {}).get("_reference_basemap")))
         c.restoreState()
 
         from original_frame import original_titleblock

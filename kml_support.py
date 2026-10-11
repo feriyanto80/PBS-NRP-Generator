@@ -1,6 +1,7 @@
 """KML and KMZ input support for PBS Network Route Plan Generator."""
 import math
 import os
+import re
 import zipfile
 from xml.etree import ElementTree as ET
 
@@ -20,17 +21,18 @@ def parse_kml_bytes(source):
     # in the PDF/legend and CAD blocks match the actual device type.
     parents={child:parent for parent in root.iter() for child in parent}
     def get_type(placemark):
-        tokens=[]
+        metadata=[]
         for entry in placemark.iter():
             if _tag_name(entry.tag)=="Data":
                 key=(entry.get("name") or "").lower()
                 if any(k in key for k in ("type","device","perangkat","symbol","jenis")):
                     value=next((c.text for c in entry if _tag_name(c.tag)=="value"),None)
-                    if value:tokens.append(str(value))
+                    if value:metadata.append(str(value))
             if _tag_name(entry.tag)=="SimpleData":
                 key=(entry.get("name") or "").lower()
                 if any(k in key for k in ("type","device","perangkat","symbol","jenis")):
-                    if entry.text:tokens.append(entry.text)
+                    if entry.text:metadata.append(entry.text)
+        tokens=[]
         current=parents.get(placemark)
         for _ in range(8):
             if current is None:break
@@ -38,8 +40,18 @@ def parse_kml_bytes(source):
                 folder=next((c.text for c in current if _tag_name(c.tag)=="name"),None)
                 if folder:tokens.append(folder)
             current=parents.get(current)
-        # Only class names appearing as whole words count as authority.
+        # ExtendedData is explicit; folder names are context only.
         from template_symbols import canonical
+        for explicit in metadata:
+            value=canonical(explicit)
+            if value:
+                return value
+        own_name=next(((c.text or "").strip() for c in placemark
+                       if _tag_name(c.tag)=="name"),"")
+        # HP ODP 02/03 means HP served by ODP: NOT an ODP device.
+        if re.fullmatch(r"\d+",own_name) and any(
+                re.search(r"\bHP\b",folder.upper()) for folder in tokens):
+            return "HP"
         for text in tokens:
             value=canonical(text)
             if value:
