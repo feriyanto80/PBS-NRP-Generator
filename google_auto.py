@@ -20,9 +20,6 @@ from shapely import wkt
 
 MANIFEST_URL = "https://openbuildings-public-dot-gweb-research.uw.r.appspot.com/public/tiles.geojson"
 TILE_PREFIX = "https://storage.googleapis.com/open-buildings-data/v3/polygons_s2_level_4_gzip/"
-MAX_DOWNLOAD_MB = 80
-MAX_TILES = 2
-MAX_FOOTPRINTS = 50000
 
 
 def _atomic_json(path, data):
@@ -80,138 +77,83 @@ def _matching_tiles(manifest,bbox):
     return found
 
 
-def _load_tile(url,bbox,opener,confidence,max_bytes,max_count,progress=None):
-    """Bounded streaming HTTP read with byte-level progress and safety checks."""
-    progress=progress or (lambda message:None)
-    request=urllib.request.Request(url,headers={"User-Agent":"PBS-NRP-Generator/1.0.11"})
-    chunks=[]
-    total=0
-    with opener(request,timeout=60) as response:
-        amount=response.headers.get("Content-Length") if hasattr(response,"headers") else None
-        if amount and int(amount)>max_bytes:
-            raise ValueError("Tile Google terlalu besar (header Content-Length)")
-        while total<=max_bytes:
-            block=response.read(min(1024*1024,max_bytes+1-total))
-            if not block:
-                break
-            chunks.append(block)
-            total+=len(block)
-            if total%(4*1024*1024)<len(block) or total>max_bytes:
-                expected=f" / {int(amount)/1048576:.1f} MB" if amount else ""
-                progress(f"Google Buildings | fase 3/4: unduh {total/1048576:.1f} MB{expected} (maksimum {max_bytes/1048576:.0f} MB)")
-    if total>max_bytes:
-        raise ValueError(f"Tile Google melebihi batas unduh aman {max_bytes/1048576:.0f} MB")
-    raw=b"".join(chunks)
-    progress(f"Google Buildings | fase 3/4: file {len(raw)/1048576:.1f} MB diterima; ekstrak footprint")
-    polygons=[]
-    extent=box(*bbox)
-    with gzip.GzipFile(fileobj=io.BytesIO(raw),mode="rb") as gz:
-        rows=csv.DictReader(io.TextIOWrapper(gz,encoding="utf-8-sig"))
-        for row in rows:
-            try:
-                score=float(row.get("confidence","0"))
-                lon=float(row.get("longitude","nan"))
-                lat=float(row.get("latitude","nan"))
-            except (TypeError,ValueError):
-                continue
-            if score<confidence or not (bbox[0]<=lon<=bbox[2] and bbox[1]<=lat<=bbox[3]):
-                continue
-            rawgeom=row.get("geometry") or row.get("wkt")
-            if not rawgeom:
-                continue
-            try:
-                geom=wkt.loads(rawgeom)
-                if geom.is_empty or not geom.intersects(extent):
-                    continue
-                if not geom.is_valid:
-                    geom=geom.buffer(0)
-                geom=geom.intersection(extent)
-                if geom.geom_type=="Polygon":
-                    pieces=[geom]
-                elif hasattr(geom,"geoms"):
-                    pieces=[g for g in geom.geoms if g.geom_type=="Polygon"]
-                else:
-                    pieces=[]
-                for polygon in pieces:
-                    if polygon.area>=1e-13:
-                        polygons.append([tuple(map(float,p)) for p in polygon.exterior.coords])
-                        if len(polygons)>max_count:
-                            raise ValueError("Batas jumlah bangunan terlampaui")
-            except (TypeError,ValueError,AttributeError):
-                continue
-    return polygons
-
-
 def acquire_google(bbox, progress=None, cache_dir=None, opener=None,
-                   max_download_mb=MAX_DOWNLOAD_MB, max_tiles=MAX_TILES,
+                   max_download_mb=None, max_tiles=None,
                    min_confidence=.70, manifest=None, tile_loader=None):
-    """Return polygons, status, reason. No Google data is invented on failure."""
-    progress=progress or (lambda message:None)
-    opener=opener or urllib.request.urlopen
-    directory=cache_dir or os.path.join(os.path.expanduser("~"),".pbs_nrp","google_cache")
+    """Download ALL Google V3 tiles crossing the project, without a size cap.
+
+    Complete compressed tiles are cached permanently; interrupted transfers
+    are resumed via HTTP Range, and regional polygons are cached separately.
+    A minimum free-disk reserve remains mandatory for machine safety.
+    Legacy size-limit parameters are accepted but intentionally ignored.
+    """
+    from google_stream import download_tile, extract_region, default_cache
+
+    progress = progress or (lambda msg:None)
+    directory = cache_dir or default_cache()
+    opener = opener or urllib.request.urlopen
     os.makedirs(directory,exist_ok=True)
-    bb=tuple(map(float,bbox))
+    bb = tuple(map(float,bbox))
     if len(bb)!=4 or not (-180<=bb[0]<bb[2]<=180 and -90<=bb[1]<bb[3]<=90):
         raise ValueError("Boundary Google tidak valid")
-    key=hashlib.sha256((", ".join(f"{v:.7f}" for v in bb)+f":v3:{min_confidence}").encode()).hexdigest()[:22]
-    path=os.path.join(directory,"region_"+key+".json")
+    key=hashlib.sha256((",".join(f"{v:.7f}" for v in bb)+f":v3:{min_confidence}").encode()).hexdigest()[:22]
+    path=os.path.join(directory,"regions","region_"+key+".json")
     if os.path.isfile(path):
         try:
             with open(path,encoding="utf-8") as handle:
-                result=json.load(handle)
-            if result.get("complete") and result.get("source")=="GOOGLE_OPEN_BUILDINGS_V3":
-                result["cache_hit"]=True
-                progress("Google Buildings: menggunakan cache regional")
-                return result
-        except (OSError,ValueError,AttributeError):
+                saved=json.load(handle)
+            if saved.get("complete") and saved.get("source")=="GOOGLE_OPEN_BUILDINGS_V3":
+                saved["cache_hit"]=True
+                progress(f"Google Buildings | REGION CACHE HIT | {len(saved.get('polygons',[])):,} footprint proyek, tanpa scan ulang")
+                return saved
+        except (OSError,ValueError,TypeError):
             pass
+    progress("Google Buildings | fase 1/4: membaca katalog tile resmi (cache 14 hari)")
     try:
-        progress("Google Buildings | fase 1/4: mengambil katalog tile resmi (cache 14 hari)")
         data=manifest if manifest is not None else _catalog(directory,opener)
     except (OSError,ValueError,urllib.error.URLError) as exc:
-        return {"polygons":[],"source":"GOOGLE_OPEN_BUILDINGS_V3","status":"unavailable",
-                "reason":"Katalog Google gagal: "+str(exc)[:160],"complete":False}
-    progress("Google Buildings | fase 2/4: mencocokkan tile dengan boundary proyek")
+        return {"polygons":[],"source":"GOOGLE_OPEN_BUILDINGS_V3",
+                "status":"unavailable","reason":"Katalog Google gagal: "+str(exc)[:180],
+                "complete":False,"cache_dir":directory}
+    progress("Google Buildings | fase 2/4: filter tile yang beririsan dengan batas proyek")
     tiles=_matching_tiles(data,bb)
     if not tiles:
-        return {"polygons":[],"source":"GOOGLE_OPEN_BUILDINGS_V3","status":"no_coverage",
-                "reason":"Tidak ada cakupan tile Google V3","complete":False}
-    progress(f"Google Buildings | {len(tiles)} tile ditemukan; batas aman {max_download_mb:.0f} MB per tile")
-    budget=int(max_download_mb*1024*1024)
-    selected=[]
-    skipped=[]
-    for ident,url,size in tiles:
-        if size is not None and size>max_download_mb:
-            progress(f"Google Buildings | SKIP {ident}: {size:,.0f} MB > {max_download_mb:.0f} MB; menghindari unduhan raksasa")
-            skipped.append(f"{ident}: {size:.0f} MB")
-        elif len(selected)>=max_tiles:
-            skipped.append(f"{ident}: batas jumlah tile")
-        else:
-            selected.append((ident,url))
-    if not selected:
-        progress("Google Buildings | fase 3/4: tidak ada tile yang aman untuk diunduh")
-        progress("Google Buildings | fase 4/4: lanjut ke penggabungan OSM; hasil Google = 0, bukan kegagalan UI")
         return {"polygons":[],"source":"GOOGLE_OPEN_BUILDINGS_V3",
-                "status":"skipped_large","complete":False,
-                "tiles_found":len(tiles),"tiles_skipped":len(skipped),
-                "reason":"Tile Google terlalu besar: "+", ".join(skipped[:3])}
+                "status":"no_coverage","reason":"Belum ada tile Google untuk boundary ini",
+                "complete":False,"cache_dir":directory}
+    progress(f"Google Buildings | {len(tiles)} tile relevan | TANPA batas ukuran/jumlah, cache {directory}")
     polygons=[]
-    errors=[]
-    for index,(ident,url) in enumerate(selected,1):
-        progress(f"Google Buildings | fase 3/4: mengunduh tile {index}/{len(selected)}: {ident} (batas {max_download_mb:.0f} MB)")
+    failures=[]
+    reused=0
+    for index,(ident,url,size_mb) in enumerate(tiles,1):
+        estimate=(f"{size_mb:,.0f} MB" if size_mb else "ukuran tidak tersedia")
+        progress(f"Google Buildings | fase 3/4: tile {index}/{len(tiles)} {ident} | {estimate} | unduh/resume")
         try:
-            data=(tile_loader(url,bb) if tile_loader else
-                  _load_tile(url,bb,opener,min_confidence,budget,MAX_FOOTPRINTS-len(polygons),progress=progress))
-            polygons.extend(data)
-        except (ValueError,OSError,urllib.error.URLError) as exc:
-            errors.append(f"{ident}: {str(exc)[:100]}")
-    progress(f"Google Buildings | fase 4/4: evaluasi {len(polygons):,} polygon, {len(skipped)} tile dilewati, {len(errors)} error")
-    complete=not errors and not skipped
+            if tile_loader is not None:
+                # Injectable offline test hook. Production always uses disk.
+                extracted=tile_loader(url,bb)
+            else:
+                def report(msg,index=index,total=len(tiles)):
+                    progress(f"Google Buildings | TILE {index}/{total} | "+msg)
+                archive,cache_hit=download_tile(
+                    url,ident,directory,size_mb=size_mb,
+                    progress=report,opener=opener)
+                reused+=int(cache_hit)
+                extracted=extract_region(archive,bb,confidence=min_confidence,progress=report)
+            polygons.extend(extracted)
+            progress(f"Google Buildings | tile {index}/{len(tiles)} DONE | {len(extracted):,} polygon area | total {len(polygons):,}")
+        except (OSError,ValueError,TypeError,urllib.error.URLError) as exc:
+            reason=f"{ident}: {str(exc)[:250]}"
+            failures.append(reason)
+            progress(f"Google Buildings | tile {index}/{len(tiles)} ERROR | {reason} | cache parsial dipertahankan")
+    progress(f"Google Buildings | fase 4/4: {len(polygons):,} footprint; tile berhasil {len(tiles)-len(failures)}/{len(tiles)}; cache hit {reused}")
+    complete=not failures
     result={"polygons":polygons,"source":"GOOGLE_OPEN_BUILDINGS_V3",
             "status":"ready" if complete else ("partial" if polygons else "unavailable"),
-            "reason":"; ".join((errors+skipped)[:3]),"complete":complete,
-            "tiles_found":len(tiles),"tiles_skipped":len(skipped),
-            "cache_hit":False,"confidence":min_confidence}
+            "reason":"; ".join(failures[:3]),
+            "complete":complete,"tiles_found":len(tiles),"tiles_failed":len(failures),
+            "tiles_cached":reused,"cache_hit":False,"cache_dir":directory,
+            "confidence":min_confidence}
     if complete:
         _atomic_json(path,result)
     return result
