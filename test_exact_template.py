@@ -68,6 +68,11 @@ class TemplateIntegrationTests(unittest.TestCase):
     def _make_dxf(self):
         source=ezdxf.new("R2018")
         layout=source.layouts.new("Layout1-ALL")
+        source.linetypes.new("DASHED2",dxfattribs={
+            "description":"Native reference CAD dashed 0.5x",
+            "pattern":[9.525,6.35,-3.175]})
+        layout.add_line((1425,1185),(1495,1185),
+                        dxfattribs={"linetype":"DASHED2"})
         for i in range(90):
             y=1245-i*5.3
             layout.add_line((1414,y),(1655,y),dxfattribs={"layer":"0"})
@@ -114,6 +119,9 @@ class TemplateIntegrationTests(unittest.TestCase):
         texts=[ent.dxf.text for ent in sheet.query("TEXT")]
         self.assertIn("ORIGINAL REFERENCE LEGEND",texts)
         self.assertNotIn("PERSON PRIVATE SOURCE",texts)
+        self.assertIn("DASHED2",target.linetypes)
+        reference_pattern=[tag.value for tag in target.linetypes.get("DASHED2").pattern_tags.tags if tag.code==49]
+        self.assertEqual(reference_pattern,[6.35,-3.175])
         with tempfile.TemporaryDirectory() as folder:
             path=Path(folder)/"tested.dxf"
             target.saveas(path)
