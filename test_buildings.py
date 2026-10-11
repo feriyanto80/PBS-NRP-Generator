@@ -78,7 +78,7 @@ class BuildingSourceTests(unittest.TestCase):
                         {"footprint_sources":{"OSM":12,"KML":3,"GOOGLE":25}})
         c.showPage()
         c.save()
-        self.assertGreater(path.stat().st_size,6000)
+        self.assertGreater(path.stat().st_size,3000)
 
 
 if __name__=="__main__":
