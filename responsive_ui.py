@@ -59,6 +59,7 @@ class ResponsiveNRP(NRPApp):
         self._map_view = None
         self._sheet_view = None
         self._drag_start = {}
+        self._section_targets = {}
         self.lines = []
         self.points = []
         self.osm = None
@@ -132,10 +133,13 @@ class ResponsiveNRP(NRPApp):
         tk.Label(self.progress_banner,textvariable=self.google_download_detail,
                  bg="#eef5ff",fg="#15364e",anchor="w",
                  font=("Consolas",9,"bold")).pack(fill="x",padx=12,pady=(2,6))
-        for title in ("1 Import KML/KMZ","2 Basemap & Bangunan",
-                      "3 Pemetaan","4 Layout & Sheet","5 Export"):
-            tk.Label(self.header_steps,text=title,font=("Segoe UI",9,"bold"),
-                     bg="#e4edf6",fg="#214562",padx=6,pady=8).pack(
+        for i,title in enumerate(("1 Import KML/KMZ","2 Basemap & Bangunan",
+                      "3 Pemetaan","4 Layout & Sheet","5 Export"),1):
+            tk.Button(self.header_steps,text=title,font=("Segoe UI",9,"bold"),
+                     bg="#e4edf6",fg="#214562",bd=0,
+                     activebackground="#d0e1f1",cursor="hand2",
+                     command=lambda section=str(i):self._jump_to_section(section),
+                     padx=6,pady=8).pack(
                          side="left",expand=True,fill="x",padx=2)
         self.quicknav=tk.Frame(root,bg="#f3f6fa")
         self.quick_buttons={}
@@ -159,8 +163,27 @@ class ResponsiveNRP(NRPApp):
                  fg="#32495b",font=("Segoe UI",9)).pack(fill="x",padx=9,pady=3)
 
     def _section(self,area,title):
-        tk.Label(area,text=title,bg="#e7edf5",fg="#173957",anchor="w",
-                 padx=10,pady=7,font=("Segoe UI",9,"bold")).pack(fill="x",pady=(8,0))
+        label=tk.Label(area,text=title,bg="#e7edf5",fg="#173957",anchor="w",
+                       padx=10,pady=7,font=("Segoe UI",9,"bold"))
+        label.pack(fill="x",pady=(8,0))
+        number=title.split(".",1)[0].strip()
+        if number.isdigit():
+            self._section_targets[number]=label
+        return label
+
+    def _jump_to_section(self,section):
+        if self._mode=="small":
+            self.show_panel("settings")
+        target=self._section_targets.get(section)
+        if not target:
+            return
+        def scroll():
+            try:
+                total=max(1,self.left_content.winfo_height())
+                self.sidebar_scroll.yview_moveto(min(.99,max(0,target.winfo_y()/total)))
+            except tk.TclError:
+                return
+        self.root.after(60,scroll)
 
     def _build_sidebar(self):
         wrap=tk.Frame(self.sidebar,bg="white")
