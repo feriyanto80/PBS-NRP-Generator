@@ -10,8 +10,41 @@ compass, A3 landscape and N.T.S.
 DWG is still produced by an appropriately licensed local ODA installation.
 """
 import math
+import os
 
 from reportlab.pdfgen import canvas as pdfcanvas
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+from template_symbols import canonical, draw_symbol
+
+_FONT_NAMES={}
+
+def _system_font(bold=False):
+    """Use the user's installed Windows Tahoma; never distribute font binaries."""
+    key="bold" if bold else "normal"
+    if key in _FONT_NAMES:
+        return _FONT_NAMES[key]
+    windows=os.environ.get("WINDIR",r"C:\Windows")
+    candidates=([os.path.join(windows,"Fonts","tahomabd.ttf")] if bold
+                else [os.path.join(windows,"Fonts","tahoma.ttf")])
+    candidates+=([
+        "/usr/share/fonts/truetype/crosextra/Carlito-Bold.ttf",
+        "/usr/share/fonts/truetype/liberation2/LiberationSans-Bold.ttf",
+    ] if bold else [
+        "/usr/share/fonts/truetype/crosextra/Carlito-Regular.ttf",
+        "/usr/share/fonts/truetype/liberation2/LiberationSans-Regular.ttf",
+    ])
+    for path in candidates:
+        if os.path.isfile(path):
+            name="PBS_Reference_Tahoma"+("Bold" if bold else "")
+            try:
+                pdfmetrics.registerFont(TTFont(name,path))
+                _FONT_NAMES[key]=name
+                return name
+            except Exception:
+                continue
+    _FONT_NAMES[key]="Helvetica-Bold" if bold else "Helvetica"
+    return _FONT_NAMES[key]
 
 from cad_sheet_layout import (
     A3_W_MM, A3_H_MM, FRAME_MARGIN, SIDEBAR_X,
@@ -79,6 +112,13 @@ class PDFCADAdapter:
         c.circle(center[0],center[1],radius,stroke=1,fill=0)
         c.restoreState()
 
+    def add_filled_circle(self,center,radius,dxfattribs=None):
+        c=self.c
+        c.saveState()
+        c.setFillColorRGB(*self._color(dxfattribs))
+        c.circle(center[0],center[1],radius,stroke=0,fill=1)
+        c.restoreState()
+
     def add_solid(self,points,dxfattribs=None):
         if len(points)<3:
             return
@@ -102,7 +142,8 @@ class PDFCADAdapter:
         c.saveState()
         c.setFillColorRGB(*self._color(attrs))
         # In a canvas scaled by 72/25.4, a 1.5-unit font is 1.5 mm on paper.
-        c.setFont("Helvetica",height)
+        c.setFont(_system_font(bold=(str(attrs.get("style","")).endswith("TAHOMA")
+                                      and height>=2.5)),height)
         string=str(label or "").replace("%%U","").replace("\n"," ")
         c.drawString(px,py,string)
         c.restoreState()
@@ -127,30 +168,19 @@ def sheet_map_transform(extent):
 
 
 def _pdf_point(c,projected,name,style,sheet_index):
+    """Use exactly the same device class/color/shapes as the printed legend."""
     x,y=projected
-    r=max(.35,min(1.3,float(style.get("point_size",2.0))*.26))
-    typ=str(style.get("point_shape","Circle"))
-    c.setFillColorRGB(.99,.80,.13)
-    c.setStrokeColorRGB(.08,.08,.08)
-    c.setLineWidth(.14)
-    if typ=="Square":
-        c.rect(x-r,y-r,r*2,r*2,fill=1,stroke=1)
-    elif typ=="Triangle":
-        p=c.beginPath()
-        p.moveTo(x,y+r*1.1)
-        p.lineTo(x-r,y-r)
-        p.lineTo(x+r,y-r)
-        p.close()
-        c.drawPath(p,stroke=1,fill=1)
-    else:
-        c.circle(x,y,r,fill=1,stroke=1)
+    identifier=canonical(name)
+    marker=identifier or "HP"
+    s=max(.40,min(1.25,float(style.get("point_size",2.0))*.35))
+    draw_symbol(PDFCADAdapter(c),marker,x,y,size=s)
     if sheet_index>0 and style.get("point_labels",True) and name:
         c.saveState()
-        c.setFillColorRGB(.15,.15,.15)
-        c.setFont("Helvetica",1.4)
-        c.drawString(x+r+0.5,y+r*0.5,str(name)[:38])
+        c.setFillColorRGB(*((.88,.47,.03) if identifier and identifier!="HP"
+                            else (.15,.15,.15)))
+        c.setFont(_system_font(),1.45)
+        c.drawString(x+s+0.35,y+s*.28,str(name)[:38])
         c.restoreState()
-
 
 def draw_pdf_reference(path,lines,points,project,page_w,page_h,title,sheets,osm=None):
     """Reference-profile PDF with identical sheet geometry to exported DXF.
