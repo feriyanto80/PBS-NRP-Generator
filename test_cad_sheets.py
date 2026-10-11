@@ -65,20 +65,20 @@ class CadLayoutTests(unittest.TestCase):
             self.assertEqual(len(doc.modelspace().query("LWPOLYLINE")),4)
 
     def test_pdf_same_dynamic_number_of_pages(self):
-        import fitz
+        from pypdf import PdfReader
         with tempfile.TemporaryDirectory() as d:
             path=Path(d)/"nrp_reference.pdf"
             draw_pdf(str(path),self.lines,self.points,None,
                      *landscape(A3),"FTTH STASIUN LEMAH ABANG PHASE 1 SIMPANGAN",
                      self.sheets,self.osm)
-            pdf=fitz.open(path)
-            self.assertEqual(len(pdf),len(self.sheets))
-            for i,page in enumerate(pdf):
-                self.assertAlmostEqual(page.rect.width,1190.55,delta=2)
-                self.assertAlmostEqual(page.rect.height,841.89,delta=2)
-                self.assertIn("AS BUILT DRAWING",page.get_text())
-                self.assertIn("CABLE TYPE",page.get_text())
-            pdf.close()
+            pdf=PdfReader(str(path))
+            self.assertEqual(len(pdf.pages),len(self.sheets))
+            for i,page in enumerate(pdf.pages):
+                self.assertAlmostEqual(float(page.mediabox.width),1190.55,delta=2)
+                self.assertAlmostEqual(float(page.mediabox.height),841.89,delta=2)
+                text=page.extract_text()
+                self.assertIn("AS BUILT DRAWING",text)
+                self.assertIn("CABLE TYPE",text)
 
 
 if __name__=="__main__":
