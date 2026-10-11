@@ -367,8 +367,18 @@ def draw_dxf(path,lines,points,sheets,osm=None):
             pass
         else:
             # Non-reference style remains a deliberate optional fallback.
-            m.add_circle((px,py),max(.5,radius/2),
-                         dxfattribs={"layer":"POINTS"})
+            shape=str(style.get("point_shape","Circle"))
+            if shape=="Square":
+                m.add_lwpolyline([(px-radius,py-radius),(px+radius,py-radius),
+                                  (px+radius,py+radius),(px-radius,py+radius)],
+                                  close=True,dxfattribs={"layer":"POINTS"})
+            elif shape=="Triangle":
+                m.add_lwpolyline([(px,py+radius),(px-radius,py-radius),
+                                  (px+radius,py-radius)],close=True,
+                                  dxfattribs={"layer":"POINTS"})
+            else:
+                m.add_circle((px,py),max(.5,radius/2),
+                             dxfattribs={"layer":"POINTS"})
         if labels and text_position:
             m.add_text(label[:64],dxfattribs={
                 "height":1.7,"insert":text_position,
