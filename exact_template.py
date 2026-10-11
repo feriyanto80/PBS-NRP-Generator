@@ -88,6 +88,13 @@ def _original_static_entity(ent,bb):
 def _target_upper_entity(ent):
     if ent.dxftype()=="VIEWPORT":
         return False
+    # The sample STARLITE emblem is an embedded OLE2FRAME which ezdxf
+    # cannot safely transplant. Preserve the v1.0.17 editable vector logo
+    # while other top-frame symbols and font entities come from the source.
+    if ent.dxf.layer=="NRP_TB_LOGO":
+        return False
+    if ent.dxftype()=="TEXT" and "S T A R L I T E" in ent.dxf.get("text",""):
+        return False
     bb=_source_bbox(ent)
     if bb is None:
         return False
