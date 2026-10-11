@@ -10,32 +10,35 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-      - name: Extract v1.0.3 cumulative source
+      - name: Extract cumulative v1.0.3 baseline
         shell: pwsh
         run: |
           tar -xJf PBS_NRP_Source_v1.0.3.tar.xz
-          if (!(Test-Path app.py)) { throw "Source archive missing app.py" }
+          if (!(Test-Path app.py)) { throw "Baseline archive missing app.py" }
+          if (!(Test-Path launcher.py)) { throw "Dual format launcher missing" }
       - name: Setup Python 3.11
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
           architecture: x64
-      - name: Install Python dependencies
+      - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           python -m pip install -r requirements.txt
-      - name: Validate source
-        run: python -m py_compile app.py
-      - name: Build portable EXE
-        run: pyinstaller --noconfirm --clean --onefile --windowed --name PBS_NRP_Generator app.py
+      - name: Syntax validation
+        run: python -m py_compile app.py launcher.py kml_support.py test_wrapper.py
+      - name: KML KMZ regression tests
+        run: python -m unittest -v test_wrapper
+      - name: Build Windows executable v1.0.4
+        run: pyinstaller --noconfirm --clean --onefile --windowed --name PBS_NRP_Generator launcher.py
       - name: Verify EXE output
         shell: pwsh
         run: |
-          if (!(Test-Path dist/PBS_NRP_Generator.exe)) { throw "EXE artifact missing" }
+          if (!(Test-Path dist/PBS_NRP_Generator.exe)) { throw "EXE missing" }
           Write-Host "EXE bytes: $((Get-Item dist/PBS_NRP_Generator.exe).Length)"
-      - name: Upload EXE artifact
+      - name: Upload Windows EXE artifact
         uses: actions/upload-artifact@v4
         with:
-          name: PBS_NRP_Generator_Windows_x64_v1.0.3
+          name: PBS_NRP_Generator_Windows_x64_v1.0.4_KML_KMZ
           path: dist/PBS_NRP_Generator.exe
           if-no-files-found: error
