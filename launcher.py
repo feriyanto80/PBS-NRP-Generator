@@ -9,6 +9,7 @@ from app import App, bounds
 from kml_support import read_source
 from osm_acquisition import fetch_osm
 from building_sources import load_polygons, merge_sources
+from footprint_classify import audit_main_kml
 import engineering_render as engineering
 import drafter_titleblock as drafter
 
@@ -82,7 +83,8 @@ class NRPApp(App):
         try:
             lines,points=read_source(path)
             bb=bounds(lines,points)
-            kml=load_polygons(path,bbox=bb)
+            kml=audit_main_kml(path,bbox=bb)
+            self._kml_audit=kml
             self.lines,self.points=lines,points
             self._input_polygons=kml["polygons"]
             self._raw_osm=None
@@ -92,13 +94,18 @@ class NRPApp(App):
             self.stats.config(text=(
                 f"Jalur (LineString)  {len(lines):,}\n"
                 f"Titik (Point)       {len(points):,}\n"
-                f"Poligon KML        {len(self._input_polygons):,}\n"
+                f"Poligon KML mentah {kml['raw_polygons']:,}\n"
+                f"Bangunan KML valid {len(self._input_polygons):,}\n"
+                f"Nonbangunan/tak terklasifikasi {kml['unclassified_polygons']:,}\n"
                 f"Total jaringan     {len(lines)+len(points):,}"))
             self._apply_sources()
             if not self._input_polygons:
-                self.status.set("KML/KMZ berisi 0 footprint poligon; ambil OSM / import Google Open Buildings.")
+                self.status.set(
+                    f"KML: {kml['raw_polygons']:,} poligon mentah, 0 bukti bangunan. "
+                    "Poligon bidang/parcel tidak digambar sebagai atap. Ambil OSM + Google.")
             else:
-                self.status.set(f"Berhasil: {len(self._input_polygons)} polygon jaringan telah terbaca.")
+                self.status.set(f"Bangunan KML dengan atribut/nama jelas: {len(self._input_polygons):,}; "
+                                f"poligon belum diklasifikasi: {kml['unclassified_polygons']:,}.")
         except Exception as exc:
             messagebox.showerror("Import jaringan gagal",str(exc))
 
@@ -154,7 +161,8 @@ class NRPApp(App):
         stats=self.osm["footprint_sources"]
         self.extra_counts.set(
             f"OSM {stats['OSM']:,}  |  KML {stats['KML']:,}  |  Google/eksternal {stats['GOOGLE']:,}\n"
-            f"Total unik: {self.osm['footprint_total']:,}  ·  duplikat: {self.osm['footprint_duplicates']:,}")
+            f"Total bangunan terkonfirmasi: {self.osm['footprint_total']:,}  ·  duplikat: {self.osm['footprint_duplicates']:,}\n"
+            f"KML poligon non-bangunan: {getattr(self, '_kml_audit', {}).get('unclassified_polygons',0):,}")
         self.draw()
 
     def load_osm(self):
