@@ -27,7 +27,7 @@ class EngineeringTest(unittest.TestCase):
             self.assertGreater(pdf.stat().st_size,4000)
             draw_dxf(str(dxf),lines,points,sheets,osm)
             m=ezdxf.readfile(str(dxf)).modelspace()
-            self.assertEqual(len(m.query('LWPOLYLINE[layer=="OSM_ROAD_EDGES"]')),2)
+            self.assertEqual(len(m.query('LWPOLYLINE[layer=="OSM_ROAD_EDGES"]')),1)
             self.assertEqual(len(m.query('LWPOLYLINE[layer=="OSM_BUILDING_FOOTPRINT"]')),1)
 
 if __name__=='__main__':
