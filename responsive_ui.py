@@ -997,6 +997,16 @@ class ResponsiveNRP(DWGAutoMixin, NRPApp):
             messagebox.showwarning("Export terkunci",
                 "Tunggu akuisisi OSM/Google dan perhitungan sheet selesai.")
             return
+        if self.cad_reference_style.get() and not has_exact_template():
+            messagebox.showerror(
+                "Template CAD asli tidak lengkap",
+                "Mode CAD Reference membutuhkan kedua file sumber di folder "
+                "template, di sebelah PBS_NRP_Generator.exe:\n\n"
+                "ABD St.Lemah Abang Phase 1 Simpangan.dxf\n"
+                "ABD St.Lemah Abang Phase 1 Simpangan.pdf\n\n"
+                "Ekspor dihentikan supaya simbol asli tidak diam-diam "
+                "diganti bentuk rekonstruksi. Ekstrak ZIP portable lengkap.")
+            return
         proceed,restore_dwg=self.dwg_preflight()
         if not proceed:
             return

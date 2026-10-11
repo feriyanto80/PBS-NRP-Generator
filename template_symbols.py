@@ -33,6 +33,12 @@ def attrs(layer,colour):
 
 def canonical(name):
     """Explicit semantic classification, never infer device from a numeric ID."""
+    verified=getattr(name,"nrp_kind",None)
+    if verified in ("HP","T6","T7","T9","TE","TL","ODC","ODC_EXIST",
+                    "ODP","ODP16","ODP24","ODP_EXIST","OTB","ODT",
+                    "CLOSURE","CLOSURE_EXIST","COIL","COIL_EXIST",
+                    "HH","HH_EXIST","HH_OTHER"):
+        return verified
     text=re.sub(r"[^A-Z0-9]+"," ",str(name or "").upper()).strip()
     words=set(text.split())
     if "ODC" in words:

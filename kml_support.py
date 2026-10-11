@@ -10,6 +10,14 @@ def _tag_name(tag):
     return tag.rsplit('}', 1)[-1]
 
 
+class TypedPointName(str):
+    """Preserve original KML point label while carrying a verified CAD kind."""
+    def __new__(cls, name, kind):
+        obj=str.__new__(cls,name)
+        obj.nrp_kind=kind
+        return obj
+
+
 def parse_kml_bytes(source):
     try:
         root = ET.fromstring(source)
@@ -49,8 +57,12 @@ def parse_kml_bytes(source):
         own_name=next(((c.text or "").strip() for c in placemark
                        if _tag_name(c.tag)=="name"),"")
         # HP ODP 02/03 means HP served by ODP: NOT an ODP device.
+        # Numeric point labels within PRECON TO DC are homepass drops,
+        # not ODC equipment. This is the 289–320 Lemahabang regression.
+        # Genuine numbered equipment elsewhere retains folder authority.
         if re.fullmatch(r"\d+",own_name) and any(
-                re.search(r"\bHP\b",folder.upper()) for folder in tokens):
+                re.search(r"\bHP\b",folder.upper()) or
+                "PRECON TO DC" in folder.upper() for folder in tokens):
             return "HP"
         for text in tokens:
             value=canonical(text)
@@ -70,7 +82,12 @@ def parse_kml_bytes(source):
         # A generic HP/numeric label does not override explicit device
         # authority from Folder or ExtendedData (e.g. ODP/001/HP 008).
         if role and (not own_kind or (own_kind=="HP" and role!="HP")):
-            styled_name=(role+" "+name).strip()
+            if re.fullmatch(r"\d+",name):
+                styled_name=(role+" "+name).strip()
+            else:
+                # Do not print invented 'ODP ' / 'ODC ' prefixes on the
+                # PDF: the source label is 'W2_LMB_JKBN...', not 'ODP W2...'.
+                styled_name=TypedPointName(name,role)
         upper = (name+" "+(role or "")).upper()
         category = ('FEEDER' if 'FEEDER' in upper and 'SUB' not in upper else
                     'SUBFEEDER' if 'SUB' in upper else 'DISTRIBUSI')
