@@ -131,10 +131,13 @@ class TemplateIntegrationTests(unittest.TestCase):
         count=overlay_pdf_upper_titleblock(dest,self.pdf)
         self.assertEqual(count,1)
         result=fitz.open(dest)
-        text=result[0].get_text()
-        # The synthetic portrait page contains a marker partly outside the
-        # reference clipped column. The visible portion must survive rotation.
-        self.assertIn("REFERENCE",text)
+        # Exact graphic is a safe cropped raster, not a FormXObject that
+        # accidentally embeds the entire confidential reference project.
+        self.assertGreaterEqual(len(result[0].get_images(full=True)),1)
+        target=fitz.Rect(993,16,1158,442)
+        pix=result[0].get_pixmap(matrix=fitz.Matrix(1,1),clip=target)
+        self.assertTrue(any(value < 110 for value in pix.samples))
+        self.assertNotIn("PERSON PRIVATE SOURCE",result[0].get_text())
         result.close()
 
 
