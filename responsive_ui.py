@@ -1,4 +1,4 @@
-"""Adaptive desktop shell v1.0.17.
+"""Adaptive desktop shell v1.0.18.
 
 Three-pane desktop, two-pane laptop and single-pane small-screen layouts.
 Independent mousewheel/+/- zoom and mouse-drag pan on map and sheet previews.
@@ -21,6 +21,7 @@ from google_auto import acquire_google
 from google_stream import default_cache
 from drawing_settings import apply_presentation
 from dwg_ui import DWGAutoMixin
+from exact_template import has_exact_template, find_reference
 
 
 class ResponsiveNRP(DWGAutoMixin, NRPApp):
@@ -92,7 +93,7 @@ class ResponsiveNRP(DWGAutoMixin, NRPApp):
         self.google_download_stage = tk.StringVar(value="Google Buildings · menunggu unduhan")
         self.google_download_detail = tk.StringVar(value="Belum ada file yang sedang diunduh")
         self.overall_progress_label = tk.StringVar(value="PROGRES PEKERJAAN · 0%")
-        root.title("PBS Network Route Plan Generator v1.0.17")
+        root.title("PBS Network Route Plan Generator v1.0.18")
         root.configure(bg="#eef2f6")
         sw, sh = root.winfo_screenwidth(), root.winfo_screenheight()
         root.geometry(f"{max(620,min(sw-60,1550))}x{max(470,min(sh-95,920))}")
@@ -107,7 +108,7 @@ class ResponsiveNRP(DWGAutoMixin, NRPApp):
         root=self.root
         header=tk.Frame(root,bg="#164b82",height=53)
         header.pack(fill="x")
-        tk.Label(header,text="PBS  Network Route Plan Generator   v1.0.17",
+        tk.Label(header,text="PBS  Network Route Plan Generator   v1.0.18",
                  bg="#164b82",fg="white",font=("Segoe UI",15,"bold"),
                  anchor="w").pack(side="left",fill="x",expand=True,padx=16,pady=10)
         self.header_steps=tk.Frame(root,bg="#e4edf6")
@@ -353,8 +354,18 @@ class ResponsiveNRP(DWGAutoMixin, NRPApp):
         tk.Checkbutton(panel,text="Format CAD Referensi Lemah Abang 2018",
                        variable=self.cad_reference_style,bg="white",
                        font=("Segoe UI",8,"bold")).pack(fill="x",padx=10,pady=(1,2))
-        tk.Label(panel,text="49 nama layer, simbol block ODP/ODC/T6/T7/T9/TE/OTB, "
-                 "title block bilingual. PDF + CAD memakai satu geometri A3.",
+        exact=has_exact_template()
+        self.template_status = tk.StringVar(value=(
+            "TEMPLATE ASLI AKTIF · PDF + DXF Lemah Abang ditemukan."
+            if exact else
+            "TEMPLATE ASLI TIDAK ADA · gunakan ZIP kumulatif agar bentuk font/logo persis."
+        ))
+        tk.Label(panel,textvariable=self.template_status,
+                 bg="white",fg=("#116439" if exact else "#ad5a20"),
+                 wraplength=250,justify="left",
+                 font=("Segoe UI",8,"bold")).pack(fill="x",padx=12,pady=(0,4))
+        tk.Label(panel,text="Mode template asli memakai garis/teks/simbol dari DXF 2018 "
+                 "dan bagian legenda PDF asli tanpa membawa nama proyek lama.",
                  bg="white",fg="#526a7b",wraplength=250,justify="left",
                  font=("Segoe UI",8)).pack(fill="x",padx=12,pady=(0,5))
         preset_line=tk.Frame(panel,bg="white")
