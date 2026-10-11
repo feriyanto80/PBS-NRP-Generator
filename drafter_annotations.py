@@ -78,6 +78,47 @@ class RectangleIndex:
             self.grid[key].append(i)
 
 
+def plan_symbols(prepared,project,bounds,radius=1.20):
+    """Map/PDF and DXF shared symbol deconfliction with visible callout leaders.
+
+    Georeferenced anchor is NEVER altered. Display glyph may be moved by a
+    short leader when two native CAD symbols would occupy the same paper spot.
+    This preserves true infrastructure locations while keeping both legible.
+    Return (kind,label,anchor_xy,display_xy) in original item order.
+    """
+    xmin,ymin,xmax,ymax=bounds
+    occupied=RectangleIndex(max(2.0,radius*2.3))
+    result=[]
+    seen=set()
+    for original,coord,kind,label in prepared:
+        if kind=="HP":
+            continue
+        px,py=project(coord)
+        if not (xmin<=px<=xmax and ymin<=py<=ymax):
+            continue
+        token=(kind,round(px,6),round(py,6))
+        if token in seen:
+            continue
+        seen.add(token)
+        d=2.30*radius
+        offsets=[(0,0),(d,0),(-d,0),(0,d),(0,-d),
+                 (d,d),(-d,d),(d,-d),(-d,-d),
+                 (2*d,0),(-2*d,0),(0,2*d),(0,-2*d)]
+        selected=(px,py)
+        for ox,oy in offsets:
+            x,y=px+ox,py+oy
+            rect=(x-radius,y-radius,x+radius,y+radius)
+            if (xmin<=rect[0] and rect[2]<=xmax
+                and ymin<=rect[1] and rect[3]<=ymax
+                and not occupied.overlap(rect)):
+                selected=(x,y)
+                break
+        occupied.insert((selected[0]-radius,selected[1]-radius,
+                         selected[0]+radius,selected[1]+radius))
+        result.append((kind,label,(px,py),selected))
+    return result
+
+
 def plan_labels(prepared, project, bounds, width, size=1.35):
     """Return (kind,label,point_xy,label_xy,font_size) in page/metric units.
 
@@ -85,23 +126,28 @@ def plan_labels(prepared, project, bounds, width, size=1.35):
     label or a device symbol. All source-coordinate positions remain intact.
     """
     xmin,ymin,xmax,ymax=bounds
+    symbol_map={}
+    for kind,label,original,display in plan_symbols(
+            prepared,project,bounds,radius=size*.94):
+        symbol_map[(kind,label,round(original[0],5),
+                    round(original[1],5))]=display
     visible=[]
     for name,coord,kind,label in prepared:
         x,y=project(coord)
         if xmin<=x<=xmax and ymin<=y<=ymax:
-            visible.append((kind,label,x,y))
+            key=(kind,label,round(x,5),round(y,5))
+            dx,dy=symbol_map.get(key,(x,y))
+            visible.append((kind,label,x,y,dx,dy))
     occupied=RectangleIndex(max(2.2,size*3))
-    # Source device symbols stay centered; reserve only the physical glyph,
-    # never shift them away from their true coordinate.
-    for kind,label,x,y in visible:
+    for kind,label,x,y,dx,dy in visible:
         if kind!="HP":
             r=size*.94
-            occupied.insert((x-r,y-r,x+r,y+r))
+            occupied.insert((dx-r,dy-r,dx+r,dy+r))
     # Priority: larger network infrastructure labels first, then HP numbers.
     ordering=sorted(enumerate(visible),key=lambda item:
                     (item[1][0]=="HP",item[0]))
     placements={}
-    for index,(kind,label,x,y) in ordering:
+    for index,(kind,label,x,y,dx0,dy0) in ordering:
         fs=size if kind=="HP" else size*.95
         width_est=max(fs*.65,fs*(.59*len(label)+.2))
         h=fs*1.15
@@ -115,7 +161,7 @@ def plan_labels(prepared, project, bounds, width, size=1.35):
         ]
         choice=None
         for offx,offy in offsets:
-            bx=x+offx;by=y+offy
+            bx=dx0+offx;by=dy0+offy
             r=(bx-.10,by-.16,bx+width_est+.10,by+h+.10)
             if (r[0]>=xmin+.20 and r[2]<=xmax-.20 and
                 r[1]>=ymin+.20 and r[3]<=ymax-.20 and
