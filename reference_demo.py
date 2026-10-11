@@ -57,8 +57,8 @@ def run():
          "_project_title":"PBS NRP - DEMO TEMPLATE",
          "_drawing_style":{"point_shape":"Circle","point_size":2,
                            "point_labels":True}}
-    pdf=out/"PBS_NRP_v1.0.16_Reference_Demo.pdf"
-    dxf=out/"PBS_NRP_v1.0.16_Reference_Demo.dxf"
+    pdf=out/"PBS_NRP_v1.0.18_Reference_Demo.pdf"
+    dxf=out/"PBS_NRP_v1.0.18_Reference_Demo.dxf"
     draw_pdf(str(pdf),lines,points,None,*landscape(A3),
              "PBS NRP - DEMO TEMPLATE",sheets,osm)
     draw_dxf(str(dxf),lines,points,sheets,osm)
