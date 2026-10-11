@@ -9,6 +9,7 @@ import ezdxf
 from reportlab.pdfgen import canvas as pdfcanvas
 
 from app import COLORS, viewport
+from road_topology import build_road_surfaces, iter_road_boundaries
 
 DEFAULT_ROAD_WIDTH_M = 5.5
 ROAD_COLOR = (0.66, 0.66, 0.66)
@@ -87,6 +88,12 @@ def _paper_halfwidth(xy, geographic_point, width_m):
 
 
 def draw_osm_pdf(c, osm, xy):
+    """Render clean road corridors, erasing internal overlapping offset seams.
+
+    Joined buffers make all T/X junctions and bends one contiguous road surface,
+    so only outside contours are stroked. Draw buildings first, then white road
+    pavement, then overlay the FTTH cable separately in draw_pdf().
+    """
     if not osm:
         return
     c.saveState()
@@ -97,18 +104,23 @@ def draw_osm_pdf(c, osm, xy):
     c.setLineWidth(.30)
     for geo in osm.get("buildings", []):
         if len(geo) >= 3:
-            points = [xy(p) for p in geo]
-            _pdf_path(c, points, closed=True, fill=1)
+            _pdf_path(c, [xy(p) for p in geo], closed=True, fill=1)
     c.setStrokeColorRGB(*ROAD_COLOR)
-    c.setLineWidth(.36)
-    for geo, width_m in _roads(osm):
-        pts = [xy(p) for p in geo]
-        half = _paper_halfwidth(xy, geo[0], width_m)
-        a, b = _polyline_offsets(pts, half)
-        _pdf_path(c, a)
-        _pdf_path(c, b)
+    c.setFillColorRGB(1.0, 1.0, 1.0)
+    c.setLineWidth(.43)
+    for polygon in build_road_surfaces(osm):
+        path = c.beginPath()
+        for ring in [polygon["exterior"]] + polygon["holes"]:
+            pts = [xy(pt) for pt in ring]
+            if len(pts) < 4:
+                continue
+            path.moveTo(*pts[0])
+            for xy0 in pts[1:]:
+                path.lineTo(*xy0)
+            path.close()
+        # Even-odd winding preserves inner land-island holes.
+        c.drawPath(path, stroke=1, fill=1, fillMode=0)
     c.restoreState()
-
 
 def _text_fit(c, text, x, y, width, size=8, bold=False, align="left"):
     label = str(text or "")
@@ -267,14 +279,11 @@ def draw_dxf(path,lines,points,sheets,osm=None):
             if len(geo)>=3:
                 m.add_lwpolyline([metric(p) for p in geo],close=True,
                                  dxfattribs={"layer":"OSM_BUILDING_FOOTPRINT"})
-        for geo,width_m in _roads(osm):
-            lat=geo[0][1]
-            # Web Mercator scale correction at latitude.
-            mwidth=width_m / max(.1, math.cos(math.radians(lat)))
-            a,b=_polyline_offsets([metric(p) for p in geo],mwidth/2)
-            for line in (a,b):
-                if len(line)>=2:
-                    m.add_lwpolyline(line,dxfattribs={"layer":"OSM_ROAD_EDGES"})
+        # One closed boundary per joined road contour; no double seams at junctions.
+        for geo in iter_road_boundaries(osm):
+            if len(geo) >= 4:
+                m.add_lwpolyline([metric(p) for p in geo],close=True,
+                                 dxfattribs={"layer":"OSM_ROAD_EDGES"})
     for name,cat,geo in lines:
         m.add_lwpolyline([metric(p) for p in geo],
                          dxfattribs={"layer":cat if cat in COLORS else "DISTRIBUSI"})
@@ -304,13 +313,15 @@ def draw_preview(canvas,bb,lines,points,osm,mainmap):
             if len(geo)<3: continue
             coords=[v for pt in geo for v in xy(pt)]
             canvas.create_polygon(*coords,fill="#f4f4f4",outline="#b7b7b7",width=.6)
-        for geo,width in _roads(osm):
-            pts=[xy(p) for p in geo]
-            half=_paper_halfwidth(xy,geo[0],width)
-            for road_edge in _polyline_offsets(pts,half):
-                if len(road_edge)>=2:
-                    flat=[v for pt in road_edge for v in pt]
-                    canvas.create_line(*flat,fill="#9d9d9d",width=.6)
+        # Preview uses the same polygon topology as PDF and DXF.
+        for polygon in build_road_surfaces(osm):
+            exterior = [coordinate for pt in polygon["exterior"] for coordinate in xy(pt)]
+            if len(exterior) >= 8:
+                canvas.create_polygon(*exterior,fill="#ffffff",outline="#949494",width=.85)
+            for ring in polygon["holes"]:
+                pts=[coordinate for pt in ring for coordinate in xy(pt)]
+                if len(pts) >= 8:
+                    canvas.create_line(*pts,fill="#949494",width=.85)
     for name,cat,geo in lines:
         coords=[v for pt in geo for v in xy(pt)]
         if len(coords)>=4:
