@@ -194,20 +194,22 @@ def _pdf_map_annotations(c,points,project,style,viewport):
     at *every* sheet level; the PDF never creates a yellow HP circle.
     A shared deterministic grid prevents labels crossing icons or each other.
     """
-    from drafter_annotations import prepare_points, plan_labels
+    from drafter_annotations import prepare_points, plan_labels, plan_symbols
     from reference_pdf_glyphs import draw_reference_pdf_glyph
     entries=prepare_points(points)
     xmin,ymin,xmax,ymax=viewport
-    device_centres=set()
-    for original,coord,kind,label in entries:
-        if kind=="HP":continue
-        x,y=project(coord)
-        if not (xmin<=x<=xmax and ymin<=y<=ymax):
-            continue
-        device_centres.add((round(x,3),round(y,3),kind))
+    # No accidental superimposed triangles at the same or nearby pole.
+    for kind,label,(x,y),(render_x,render_y) in plan_symbols(
+            entries,project,viewport,radius=1.19):
+        if abs(x-render_x)+abs(y-render_y)>.03:
+            c.saveState()
+            c.setLineWidth(.12)
+            c.setStrokeColorRGB(.38,.38,.38)
+            c.line(x,y,render_x,render_y)
+            c.restoreState()
         source_kind="ODT" if kind=="OTB" else kind
-        if not draw_reference_pdf_glyph(c,source_kind,x,y):
-            draw_symbol(PDFCADAdapter(c),kind,x,y,size=.70)
+        if not draw_reference_pdf_glyph(c,source_kind,render_x,render_y):
+            draw_symbol(PDFCADAdapter(c),kind,render_x,render_y,size=.70)
     placements=plan_labels(entries,project,viewport,size=1.27)
     for kind,label,anchor,(lx,ly),fs in placements:
         if kind!="HP" and not style.get("point_labels",True):
