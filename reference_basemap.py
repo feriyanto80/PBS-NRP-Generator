@@ -135,8 +135,11 @@ def basemap_from_reference(points):
         if entity.dxftype()=="LWPOLYLINE":
             vertices=[geographic((x,y)) for x,y in entity.get_points("xy")]
         elif entity.dxftype()=="LINE":
-            vertices=[geographic(entity.dxf.start[:2]),
-                      geographic(entity.dxf.end[:2])]
+            # ezdxf.acc.vector.Vec3 only supports integer indices, NOT [:2].
+            # The previous slice crashed real PDF and DXF exports with:
+            # TypeError: an integer is required
+            vertices=[geographic((entity.dxf.start.x,entity.dxf.start.y)),
+                      geographic((entity.dxf.end.x,entity.dxf.end.y))]
         else:
             continue
         if len(vertices)<2:
