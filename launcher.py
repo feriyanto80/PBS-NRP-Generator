@@ -17,6 +17,10 @@ import drafter_titleblock as drafter
 engineering._draw_titleblock = drafter.draw_titleblock
 app.draw_pdf = engineering.draw_pdf
 app.draw_dxf = engineering.draw_dxf
+# Replace legacy 6-arg ODA converter used by inherited app.App.export.
+# Keep original PDF/DXF paths and all rendering unchanged.
+from dwg_conversion import convert_dwg as _robust_oda_convert
+app.convert_dwg = _robust_oda_convert
 
 
 class NRPApp(App):
