@@ -292,6 +292,12 @@ def attach_a3_layouts(doc,sheets,project_name="",osm=None):
         # Both PDF and DXF invoke precisely this drawing function.
         from original_frame import original_titleblock
         original_titleblock(layout,project_name,title,i,len(sheets),osm or {})
+        from exact_template import find_reference, replace_cad_upper_titleblock
+        reference_dxf=find_reference("dxf")
+        if reference_dxf:
+            # Imported original glyphs, hatch patterns and CAD font style:
+            # only the static top, not historic project/approvals.
+            replace_cad_upper_titleblock(doc,layout,reference_dxf)
         # Match A3 map viewport dimensions and fit the entire specified detail.
         xa,ya=webmercator((extent[0],extent[1]))
         xb,yb=webmercator((extent[2],extent[3]))
