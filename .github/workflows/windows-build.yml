@@ -6,47 +6,45 @@ on:
 jobs:
   build-windows:
     runs-on: windows-latest
-    timeout-minutes: 35
+    timeout-minutes: 40
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
-      - name: Extract cumulative v1.0.3 baseline
+      - name: Extract original v1.0.3 application engine
         shell: pwsh
         run: |
           tar -xJf PBS_NRP_Source_v1.0.3.tar.xz
-          if (!(Test-Path app.py)) { throw "Baseline archive missing app.py" }
-          if (!(Test-Path launcher.py)) { throw "Dual-format launcher missing" }
-          if (!(Test-Path osm_acquisition.py)) { throw "OSM recovery engine missing" }
-          if (!(Test-Path engineering_render.py)) { throw "Engineering drawing renderer missing" }
-          if (!(Test-Path building_sources.py)) { throw "Footprint sources missing" }
-          if (!(Test-Path drafter_titleblock.py)) { throw "Drafter titleblock missing" }
-      - name: Setup Python 3.11
+          if (!(Test-Path app.py)) { throw "Base app.py missing" }
+          foreach ($name in @("launcher.py","building_sources.py","drafter_titleblock.py","engineering_render.py","kml_support.py","osm_acquisition.py")) {
+            if (!(Test-Path $name)) { throw "Required source missing: $name" }
+          }
+      - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
           architecture: x64
-      - name: Install Python dependencies
+      - name: Install packages
         run: |
           python -m pip install --upgrade pip
           python -m pip install -r requirements.txt
           python -m pip install "shapely>=2.0,<3"
-          python -m pip install "shapely>=2.0,<3"
-      - name: Syntax check
-        run: python -m py_compile app.py kml_support.py osm_acquisition.py launcher.py test_osm.py test_wrapper.py engineering_render.py test_engineering.py building_sources.py drafter_titleblock.py test_buildings.py building_sources.py drafter_titleblock.py test_buildings.py
-      - name: Regression tests KML/KMZ and OSM recovery
-        run: python -m unittest -v test_wrapper test_osm test_engineering test_buildings test_buildings
-      - name: Build PBS NRP Generator v1.0.7 EXE
+      - name: Validate Python syntax
+        run: python -m py_compile app.py launcher.py kml_support.py osm_acquisition.py engineering_render.py building_sources.py drafter_titleblock.py test_wrapper.py test_osm.py test_engineering.py test_buildings.py
+      - name: Run regression suite
+        run: python -m unittest -v test_wrapper test_osm test_engineering test_buildings
+      - name: Build portable Windows EXE
         run: pyinstaller --noconfirm --clean --onefile --windowed --name PBS_NRP_Generator launcher.py
-      - name: Verify Windows executable
+      - name: Validate executable
         shell: pwsh
         run: |
-          if (!(Test-Path dist/PBS_NRP_Generator.exe)) { throw "EXE artifact missing" }
-          $head = [System.IO.File]::ReadAllBytes("dist/PBS_NRP_Generator.exe")
-          if ($head.Length -lt 1000000 -or $head[0] -ne 77 -or $head[1] -ne 90) { throw "Invalid EXE format" }
-          Write-Host "EXE bytes: $($head.Length)"
-      - name: Upload Windows EXE artifact
+          $exe = "dist/PBS_NRP_Generator.exe"
+          if (!(Test-Path $exe)) { throw "EXE missing" }
+          $bytes=[System.IO.File]::ReadAllBytes($exe)
+          if ($bytes.Length -lt 1000000 -or $bytes[0] -ne 77 -or $bytes[1] -ne 90) { throw "Invalid PE executable" }
+          Write-Host "PE EXE build complete: $($bytes.Length) bytes"
+      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: PBS_NRP_Generator_Windows_x64_v1.0.7_MultiSource_Footprints_Titleblock
+          name: PBS_NRP_Generator_Win64_v1.0.7_BuildingFusion_DrafterTitleblock
           path: dist/PBS_NRP_Generator.exe
           if-no-files-found: error
