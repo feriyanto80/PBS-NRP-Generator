@@ -961,6 +961,9 @@ class ResponsiveNRP(DWGAutoMixin, NRPApp):
         old_sheets=base_app.sheets_for
         original=(self.lines,self.points,self.osm)
         self.lines,self.points,self.osm=apply_presentation(*original,self._layer_options())
+        # Metadata only, never modify the imported KML/Google records.
+        self.osm["_project_title"]=os.path.splitext(
+            os.path.basename(self.path.get() or "PBS NETWORK ROUTE PLAN"))[0]
         try:
             # Same layer settings on preview, PDF and DXF.
             base_app.sheets_for=lambda _bbox:list(self._planned_sheets)
