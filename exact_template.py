@@ -171,6 +171,21 @@ def replace_cad_upper_titleblock(doc,layout,source_path):
         layout.delete_entity(item)
     for item in imported:
         layout.add_entity(item)
+    # The user's original STARLITE logo is stored as OLE2FRAME in the DXF.
+    # OLE2FRAME is not transferable to an editable DWG titleblock and was
+    # purposefully excluded. Restore the vector-traced logo AFTER replacing
+    # static titleblock shapes so it never disappears from CAD output.
+    from starlite_logo import starlite_logo
+    if "NRP_TB_LOGO" not in doc.layers:
+        doc.layers.new("NRP_TB_LOGO",dxfattribs={"color":5})
+    logo_x=TARGET_LEFT+(1535.5-SOURCE_LEFT)*REFERENCE_SCALE
+    logo_y=TARGET_BOTTOM+(632.0-SOURCE_BOTTOM)*REFERENCE_SCALE
+    starlite_logo(layout,logo_x,logo_y,height=18.5)
+    if "NRP_TB_TEXT" not in doc.layers:
+        doc.layers.new("NRP_TB_TEXT",dxfattribs={"color":7})
+    layout.add_text("S T A R L I T E",dxfattribs={
+        "layer":"NRP_TB_TEXT","height":1.55,
+        "insert":(logo_x-9.8,logo_y-2.1)})
     return len(imported)
 
 
