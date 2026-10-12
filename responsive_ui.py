@@ -1100,6 +1100,19 @@ class ResponsiveNRP(DWGAutoMixin, NRPApp):
                 "Ekspor dihentikan supaya simbol asli tidak diam-diam "
                 "diganti bentuk rekonstruksi. Ekstrak ZIP portable lengkap.")
             return
+        from drafter_annotations import prepare_points
+        unknown=[str(name) for name,geo,kind,label
+                 in prepare_points(self.points) if kind=="UNKNOWN"]
+        if unknown:
+            sample=", ".join(unknown[:5])
+            if not messagebox.askyesno(
+                "Titik tidak terklasifikasi",
+                f"{len(unknown)} titik KML/KMZ tidak dikenali sebagai "
+                "perangkat sesuai legenda CAD. Titik tersebut tidak akan "
+                "digambar sebagai lingkaran kuning.\n\n"
+                f"Contoh: {sample}\n\n"
+                "Lanjutkan ekspor tanpa simbol untuk titik tersebut?"):
+                return
         proceed,restore_dwg=self.dwg_preflight()
         if not proceed:
             return
