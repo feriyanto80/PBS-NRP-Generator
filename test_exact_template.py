@@ -45,11 +45,15 @@ class CanonicalSymbolTests(unittest.TestCase):
     def test_map_blocks_and_legend_are_same_glyph_family(self):
         doc=ezdxf.new("R2018")
         install_symbols(doc)
+        # HP is numeric TEXT and must not have a glyph block.
         for kind in ("T6","T7","T9","TE","ODC","ODP","ODP16",
-                     "ODP24","CLOSURE","OTB","HP"):
+                     "ODP24","CLOSURE","OTB"):
             self.assertIn(kind,doc.blocks)
             block=doc.blocks.get(kind)
             self.assertTrue(len(list(block))>=1)
+        # Generic yellow HP waypoint symbols are no longer authorized.
+        if "HP" in doc.blocks:
+            self.assertEqual(len(list(doc.blocks.get("HP"))),0)
         t6=list(doc.blocks.get("T6"))
         t7=list(doc.blocks.get("T7"))
         self.assertNotEqual(
