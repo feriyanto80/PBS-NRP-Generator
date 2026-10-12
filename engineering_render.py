@@ -394,23 +394,18 @@ def draw_dxf(path,lines,points,sheets,osm=None):
         px,py=display_positions.get(key,(x,y))
         if abs(px-x)+abs(py-y)>.03:
             m.add_line((x,y),(px,py),dxfattribs={"layer":"NRP_CALLOUT"})
-        if reference_mode and add_device(doc,m,name,(px,py),
-                                         size=radius,labels=False):
-            pass
+        # Generic Circle/Square/Triangle waypoint fallback is removed.
+        # Render ONLY the exact CAD/device semantics from the 2018 legend.
+        from template_symbols import draw_symbol
+        from drafter_annotations import AUTHORIZED_DEVICE_TYPES
+        if kind not in AUTHORIZED_DEVICE_TYPES:
+            continue
+        if reference_mode:
+            # Native source block insertion when the original is available.
+            if not add_device(doc,m,name,(px,py),size=radius,labels=False):
+                draw_symbol(m,kind,px,py,size=radius)
         else:
-            # Non-reference style remains a deliberate optional fallback.
-            shape=str(style.get("point_shape","Circle"))
-            if shape=="Square":
-                m.add_lwpolyline([(px-radius,py-radius),(px+radius,py-radius),
-                                  (px+radius,py+radius),(px-radius,py+radius)],
-                                  close=True,dxfattribs={"layer":"POINTS"})
-            elif shape=="Triangle":
-                m.add_lwpolyline([(px,py+radius),(px-radius,py-radius),
-                                  (px+radius,py-radius)],close=True,
-                                  dxfattribs={"layer":"POINTS"})
-            else:
-                m.add_circle((px,py),max(.5,radius/2),
-                             dxfattribs={"layer":"POINTS"})
+            draw_symbol(m,kind,px,py,size=radius)
         if labels and text_position:
             m.add_text(label[:64],dxfattribs={
                 "height":1.7,"insert":text_position,
@@ -540,7 +535,8 @@ def draw_preview(canvas,bb,lines,points,osm,mainmap):
             canvas.create_oval(x-rr,y-rr*.6,x,y+rr*.6,outline=ink)
             canvas.create_oval(x,y-rr*.6,x+rr,y+rr*.6,outline=ink)
         else:
-            canvas.create_oval(x-rr,y-rr,x+rr,y+rr,
-                               fill="#ffd200",outline="#111111")
+            # Unknown KML placemarks have no canonical symbol. Do not
+            # invent yellow waypoint circles absent from the CAD legend.
+            continue
     canvas.create_rectangle(4,4,w-4,h-4,outline="#555")
     canvas.create_rectangle(8,8,w-8,h-8,outline="#aaa")
