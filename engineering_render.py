@@ -243,64 +243,6 @@ def draw_pdf(path,lines,points,project,page_w,page_h,title,sheets,osm=None):
     """
     from reference_pdf_layout import draw_pdf_reference
     return draw_pdf_reference(path,lines,points,project,page_w,page_h,title,sheets,osm)
-    # Legacy layout code retained below for engineering reference only.
-    c=pdfcanvas.Canvas(path,pagesize=(page_w,page_h))
-    sidebar=177
-    x0,y0=22,21
-    map_w=page_w-sidebar-49
-    map_h=page_h-43
-    bx=x0+map_w+4
-    for idx,(sheetname,bb) in enumerate(sheets):
-        c.setStrokeColorRGB(.22,.22,.22)
-        c.setLineWidth(.7)
-        c.rect(13,13,page_w-26,page_h-26)
-        c.setLineWidth(.32)
-        c.rect(18,18,page_w-36,page_h-36)
-        c.setStrokeColorRGB(.6,.6,.6)
-        c.setLineWidth(.48)
-        c.rect(x0,y0,map_w,map_h)
-        tr=viewport(bb,map_w,map_h,12)
-        def xy(p):
-            xx,yy=tr(p)
-            return x0+xx,y0+yy
-        c.saveState()
-        p=c.beginPath()
-        p.rect(x0+1,y0+1,map_w-2,map_h-2)
-        c.clipPath(p,stroke=0)
-        draw_osm_pdf(c,osm,xy)
-        for name,cat,geo in lines:
-            c.setStrokeColor(COLORS.get(cat,COLORS["DISTRIBUSI"]))
-            c.setLineWidth(1.15 if cat=="FEEDER" else .50)
-            _pdf_path(c,[xy(pt) for pt in geo])
-        # Point symbology configured in Pemetaan & Simbol.
-        style=(osm or {}).get("_drawing_style",{})
-        symbol=str(style.get("point_shape","Circle"))
-        radius=float(style.get("point_size",2.0))
-        show_labels=bool(style.get("point_labels",True))
-        c.setFont("Helvetica",4.0)
-        for name,geo in points:
-            x,y=xy(geo)
-            c.setFillColorRGB(.95,.75,.10)
-            c.setStrokeColorRGB(.17,.17,.17)
-            if symbol=="Square":
-                c.rect(x-radius,y-radius,2*radius,2*radius,stroke=1,fill=1)
-            elif symbol=="Triangle":
-                mark=c.beginPath()
-                mark.moveTo(x,y+radius*1.2)
-                mark.lineTo(x-radius*1.2,y-radius)
-                mark.lineTo(x+radius*1.2,y-radius)
-                mark.close()
-                c.drawPath(mark,stroke=1,fill=1)
-            else:
-                c.circle(x,y,radius,stroke=1,fill=1)
-            if idx>0 and show_labels and name:
-                c.setFillColorRGB(.13,.13,.13)
-                c.drawString(x+radius+1,y+1.2,name[:20])
-        c.restoreState()
-        _draw_titleblock(c,bx,y0,sidebar-1,map_h,title,sheetname,idx,len(sheets),osm)
-        c.showPage()
-    c.save()
-
 
 def draw_dxf(path,lines,points,sheets,osm=None):
     """Projected-meter DXF: two road edges + closed building footprint polylines."""
@@ -394,23 +336,18 @@ def draw_dxf(path,lines,points,sheets,osm=None):
         px,py=display_positions.get(key,(x,y))
         if abs(px-x)+abs(py-y)>.03:
             m.add_line((x,y),(px,py),dxfattribs={"layer":"NRP_CALLOUT"})
-        if reference_mode and add_device(doc,m,name,(px,py),
-                                         size=radius,labels=False):
-            pass
+        # Generic Circle/Square/Triangle waypoint fallback is removed.
+        # Render ONLY the exact CAD/device semantics from the 2018 legend.
+        from template_symbols import draw_symbol
+        from drafter_annotations import AUTHORIZED_DEVICE_TYPES
+        if kind not in AUTHORIZED_DEVICE_TYPES:
+            continue
+        if reference_mode:
+            # Native source block insertion when the original is available.
+            if not add_device(doc,m,name,(px,py),size=radius,labels=False):
+                draw_symbol(m,kind,px,py,size=radius)
         else:
-            # Non-reference style remains a deliberate optional fallback.
-            shape=str(style.get("point_shape","Circle"))
-            if shape=="Square":
-                m.add_lwpolyline([(px-radius,py-radius),(px+radius,py-radius),
-                                  (px+radius,py+radius),(px-radius,py+radius)],
-                                  close=True,dxfattribs={"layer":"POINTS"})
-            elif shape=="Triangle":
-                m.add_lwpolyline([(px,py+radius),(px-radius,py-radius),
-                                  (px+radius,py-radius)],close=True,
-                                  dxfattribs={"layer":"POINTS"})
-            else:
-                m.add_circle((px,py),max(.5,radius/2),
-                             dxfattribs={"layer":"POINTS"})
+            draw_symbol(m,kind,px,py,size=radius)
         if labels and text_position:
             m.add_text(label[:64],dxfattribs={
                 "height":1.7,"insert":text_position,
@@ -540,7 +477,8 @@ def draw_preview(canvas,bb,lines,points,osm,mainmap):
             canvas.create_oval(x-rr,y-rr*.6,x,y+rr*.6,outline=ink)
             canvas.create_oval(x,y-rr*.6,x+rr,y+rr*.6,outline=ink)
         else:
-            canvas.create_oval(x-rr,y-rr,x+rr,y+rr,
-                               fill="#ffd200",outline="#111111")
+            # Unknown KML placemarks have no canonical symbol. Do not
+            # invent yellow waypoint circles absent from the CAD legend.
+            continue
     canvas.create_rectangle(4,4,w-4,h-4,outline="#555")
     canvas.create_rectangle(8,8,w-8,h-8,outline="#aaa")

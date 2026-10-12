@@ -6,7 +6,7 @@ the renderer's per-project metadata; original KML/OSM features remain intact.
 DEFAULTS = {
     "feeder": True, "subfeeder": True, "distribution": True,
     "points": True, "roads": True, "buildings": True,
-    "point_labels": True, "point_shape": "Circle", "point_size": 2.0,
+    "point_labels": True, "point_size": 2.0,
 }
 
 def normalized(values=None):
@@ -15,9 +15,6 @@ def normalized(values=None):
         for key in DEFAULTS:
             if key in values:
                 result[key]=values[key]
-    result["point_shape"]=str(result["point_shape"]).title()
-    if result["point_shape"] not in ("Circle","Square","Triangle"):
-        result["point_shape"]="Circle"
     try:
         result["point_size"]=max(1.0,min(5.0,float(result["point_size"])))
     except (ValueError,TypeError):

@@ -7,7 +7,7 @@ The same vector primitives are used for:
 
 Colors and symbol semantics are taken from the user's real 2018 drawing
 and plotted PDF, not the previous generic 'yellow dots everywhere' renderer.
-Only homepasses/unclassified numeric points use small yellow markers.
+Homepasses use numeric TEXT only; unclassified points have no glyph.
 """
 import math
 import re
@@ -182,6 +182,7 @@ def draw_symbol(draw,kind,x,y,size=1.0,layer=None):
     elif kind=="BORING_CROSSING":
         line([(-1.1,-.65),(1.1,-.65),(1.1,.65),(-1.1,.65)],"red",True)
         circle(0,0,.65,"red")
-    else:  # HP and unclassified points: yellow homepass with dark edge
-        disc(0,0,.77,"yellow")
-        circle(0,0,.77,"black")
+    else:
+        # There is no generic waypoint symbol in the source CAD legend.
+        # UNKNOWN and HP must never be rendered as yellow circles.
+        return
