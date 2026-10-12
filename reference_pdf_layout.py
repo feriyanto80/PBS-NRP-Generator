@@ -174,6 +174,8 @@ def _pdf_point(c,projected,name,style,sheet_index):
     info=prepare_points([(name,projected)])[0]
     _name,xy,kind,label=info
     x,y=xy
+    if kind=="UNKNOWN":
+        return
     if kind=="HP":
         c.saveState()
         c.setFillColorRGB(.08,.08,.08)
