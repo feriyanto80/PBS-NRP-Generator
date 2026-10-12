@@ -7,7 +7,9 @@ georeferenced position; only annotations are shifted to avoid collisions.
 """
 import re
 from collections import defaultdict
-from template_symbols import canonical
+from template_symbols import canonical, LEGEND_IDS_LEFT, LEGEND_IDS_RIGHT
+
+AUTHORIZED_DEVICE_TYPES=set(LEGEND_IDS_LEFT+LEGEND_IDS_RIGHT+("OTB",))
 
 def prepare_points(points):
     """Return (original_name, lonlat, canonical_kind, drafter_label).
@@ -92,7 +94,9 @@ def plan_symbols(prepared,project,bounds,radius=1.20):
     result=[]
     seen=set()
     for original,coord,kind,label in prepared:
-        if kind=="HP":
+        if kind not in AUTHORIZED_DEVICE_TYPES:
+            # HP is printed as its numeric label; UNKNOWN must never be
+            # converted into an invented yellow circle without legend.
             continue
         px,py=project(coord)
         if not (xmin<=px<=xmax and ymin<=py<=ymax):
@@ -134,6 +138,8 @@ def plan_labels(prepared, project, bounds, size=1.35):
                     round(original[1],5))]=display
     visible=[]
     for name,coord,kind,label in prepared:
+        if kind!="HP" and kind not in AUTHORIZED_DEVICE_TYPES:
+            continue
         x,y=project(coord)
         if xmin<=x<=xmax and ymin<=y<=ymax:
             key=(kind,label,round(x,5),round(y,5))
