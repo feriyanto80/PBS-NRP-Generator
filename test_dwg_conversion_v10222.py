@@ -72,7 +72,7 @@ class ODACLIIntegrationTests(unittest.TestCase):
         self.assertIn("filter=*.dxf",contents)
         self.assertIn("filter=[ODA default]",contents)
         self.assertIn("Exit code: 1",contents)
-        self.assertEqual(contents.count("Exit code: 1"),7)
+        self.assertEqual(contents.count("Exit code: 1"),8)
         self.assertIn("CONTROL PROBE: FAILED",contents)
 
 
@@ -87,7 +87,7 @@ class ODACLIIntegrationTests(unittest.TestCase):
         with patch("dwg_conversion.subprocess.run",side_effect=runner):
             result=dwg_conversion.convert_dwg(self.dxf,str(self.converter))
         self.assertTrue(dwg_conversion._valid_dwg(result))
-        self.assertEqual([len(cmd) for cmd in calls],[7,7,8])
+        self.assertEqual([len(cmd) for cmd in calls],[7,7,7,8])
 
     def test_cad_auditor_sanitizes_dxf_without_changing_original(self):
         import ezdxf
