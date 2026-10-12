@@ -17,6 +17,7 @@ from app import bounds, viewport
 from adaptive_sheets import plan_sheets
 from launcher import NRPApp
 from osm_acquisition import fetch_osm
+from osm_road_recovery import fetch_roads_only, merge_recovered_roads
 from google_auto import acquire_google
 from google_stream import default_cache
 from drawing_settings import apply_presentation
@@ -34,6 +35,7 @@ class ResponsiveNRP(DWGAutoMixin, NRPApp):
         self._raw_osm = None
         self._revision = 0
         self._osm_loading = False
+        self._road_recovery_running = False
         self._footprint_loading = False
         self._google_status = "Belum diambil"
         self._google_cache_dir = default_cache()
@@ -283,6 +285,11 @@ class ResponsiveNRP(DWGAutoMixin, NRPApp):
         self.osm_button=tk.Button(panel,text="Ambil / gunakan cache OSM + Google",
                                   command=self.load_osm,wraplength=250)
         self.osm_button.pack(fill="x",padx=12,pady=4)
+        self.road_recovery_button=tk.Button(
+            panel,text="Retry Jalan OSM Saja · tanpa Google",
+            command=self.retry_osm_roads,wraplength=250,
+            bg="#e8f1fa",fg="#174b75")
+        self.road_recovery_button.pack(fill="x",padx=12,pady=(0,4))
         tk.Button(panel,text="Folder Cache Google (pilih disk penyimpanan)",
                   command=self.choose_google_cache).pack(fill="x",padx=12,pady=(3,2))
         tk.Label(panel,textvariable=self.cache_dir_text,bg="white",fg="#647484",
@@ -882,6 +889,7 @@ class ResponsiveNRP(DWGAutoMixin, NRPApp):
         self.google_download_detail.set("0.000 GB diunduh · menunggu katalog")
         self._show_progress_banner()
         self.osm_button.configure(state="disabled",text="Mengambil OSM + Google...")
+        self.road_recovery_button.configure(state="disabled")
         self._update_generate_button()
         self._record_progress(1,"Mulai OSM → Google (disk cache + resume) → Merge → Sheet Planning. Generate terkunci.")
 
@@ -903,9 +911,28 @@ class ResponsiveNRP(DWGAutoMixin, NRPApp):
                 self.root.after(0,lambda data=osm:self._osm_intermediate(revision,data))
             except Exception as exc:
                 osm_error=str(exc)
-                progress("OSM: gagal setelah fallback, tetap memeriksa Google")
+                progress("OSM: query gabungan gagal; coba highway-only")
+            # On zero road ways, retry HIGHWAY ONLY without losing footprints.
+            if not osm or not osm.get("roads"):
+                try:
+                    progress("OSM ROAD: zero-road cache repair dan failover")
+                    road_result=fetch_roads_only(bb,progress=progress)
+                    osm=merge_recovered_roads(osm or self._raw_osm,road_result)
+                    if road_result["status"] in ("READY","COMPLETE_EMPTY"):
+                        osm_error=None
+                    else:
+                        osm_error=(osm_error or "OSM jalan belum lengkap: "+
+                                   road_result["status"])
+                except Exception as exc:
+                    osm_error="Recovery jalan gagal: "+str(exc)[:180]
             try:
-                google=acquire_google(bb,progress=progress,cache_dir=self._google_cache_dir)
+                if self._google_polygons and self._google_status=="ready":
+                    google={"polygons":self._google_polygons,
+                            "status":"ready",
+                            "reason":"footprint tersimpan dipakai ulang"}
+                    progress("Google Buildings: cache hasil sebelumnya dipakai ulang")
+                else:
+                    google=acquire_google(bb,progress=progress,cache_dir=self._google_cache_dir)
             except Exception as exc:
                 google={"polygons":[],"status":"unavailable","reason":str(exc)}
             try:
@@ -914,6 +941,81 @@ class ResponsiveNRP(DWGAutoMixin, NRPApp):
             except RuntimeError:
                 pass
         threading.Thread(target=worker,daemon=True).start()
+
+    def retry_osm_roads(self):
+        """Fetch highway only; never restart Google or replace valid footprints."""
+        if not self.use_osm.get():
+            messagebox.showwarning("OSM Jalan","Aktifkan OSM jalan + bangunan dahulu.")
+            return
+        if not self.lines and not self.points:
+            messagebox.showwarning("OSM Jalan","Import KML/KMZ dahulu.")
+            return
+        if self._running or self._osm_loading or self._footprint_loading or self._planning:
+            self.status.set("Tunggu pekerjaan lain selesai sebelum Retry Jalan OSM.")
+            return
+        revision=self._revision
+        bbox=bounds(self.lines,self.points)
+        self._running=True
+        self._road_recovery_running=True
+        self.road_recovery_button.configure(state="disabled",text="Memulihkan jalan OSM...")
+        self.osm_button.configure(state="disabled")
+        self._update_generate_button()
+        self._record_progress(1,"OSM ROAD: mengambil hanya jalan, Google/HP dipertahankan")
+
+        def progress(message):
+            try:
+                self.root.after(0,lambda msg=message:
+                                self._road_recovery_progress(revision,msg))
+            except RuntimeError:
+                pass
+
+        def worker():
+            try:
+                result=fetch_roads_only(bbox,progress=progress,force_empty=True)
+                error=None
+            except Exception as exc:
+                result=None
+                error=str(exc)
+            try:
+                self.root.after(0,lambda:self._roads_only_done(
+                    revision,result,error))
+            except RuntimeError:
+                pass
+        threading.Thread(target=worker,daemon=True).start()
+
+    def _road_recovery_progress(self,revision,message):
+        if revision!=self._revision or not self._road_recovery_running:
+            return
+        match=re.search(r"OSM ROAD tile\s+(\d+)/(\d+)",message)
+        percent=(max(5,min(90,5+85*int(match.group(1))/
+                           max(int(match.group(2)),1))) if match else 7)
+        self._record_progress(percent,message)
+
+    def _roads_only_done(self,revision,result,error):
+        self._running=False
+        self._road_recovery_running=False
+        self.road_recovery_button.configure(
+            state="normal",text="Retry Jalan OSM Saja · tanpa Google")
+        self.osm_button.configure(state="normal",
+                                  text="Ambil / gunakan cache OSM + Google")
+        if revision!=self._revision:
+            self._update_generate_button()
+            return
+        if result:
+            self._raw_osm=merge_recovered_roads(self._raw_osm,result)
+            # Existing KML & Google footprint collections are retained.
+            self._apply_sources()
+        recovered=len((self._raw_osm or {}).get("roads",[]))
+        state=result.get("status","FAILED") if result else "FAILED"
+        summary=(f"OSM ROAD: {state} · {recovered} ruas · "
+                 f"tile gagal {result.get('failed_tiles',0)}"
+                 if result else "OSM ROAD: FAILED · "+str(error)[:130])
+        self._record_progress(100,"Retry Jalan OSM selesai · "+summary)
+        self._update_generate_button()
+        if state in ("FAILED","PARTIAL","COMPLETE_EMPTY"):
+            messagebox.showwarning("Pemulihan jalan OSM",summary+
+                "\nData Google Buildings dan KML tetap tersedia. "
+                "Coba ulang nanti jika server Overpass sibuk.")
 
     def _osm_intermediate(self,revision,osm):
         """Show acquired roads/OSM buildings while Google downloads gigabytes."""
@@ -933,12 +1035,14 @@ class ResponsiveNRP(DWGAutoMixin, NRPApp):
             self._running=False
             self.osm_button.configure(state="normal",
                                       text="Ambil / gunakan cache OSM + Google")
+            self.road_recovery_button.configure(state="normal")
             self._update_generate_button()
             return
         self._record_progress(91,"Akuisisi selesai; menggabungkan footprint dan deduplikasi")
         if osm is not None:
             self._raw_osm=osm
-        self._google_polygons=google.get("polygons",[])
+        if google.get("polygons"):
+            self._google_polygons=google["polygons"]
         self._google_status=google.get("status","unavailable")
         reason=google.get("reason") or ""
         self.google_label.set(
