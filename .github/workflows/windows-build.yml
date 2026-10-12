@@ -37,9 +37,9 @@ jobs:
           python -m pip install -r requirements.txt
           python -m pip install "shapely>=2.0,<3" pypdf "pymupdf>=1.24"
       - name: Validate Python syntax
-        run: python -m py_compile app.py launcher.py kml_support.py osm_acquisition.py osm_road_recovery.py test_osm_road_recovery_v1026.py engineering_render.py export_worker.py export_progress_ui.py test_export_progress_v10227.py building_sources.py drafter_titleblock.py road_topology.py test_wrapper.py test_osm.py test_engineering.py test_buildings.py test_junctions.py google_auto.py responsive_ui.py footprint_classify.py test_responsive.py test_gui_smoke.py test_footprint_audit.py adaptive_sheets.py test_adaptive_sheets.py google_stream.py test_google_stream.py drawing_settings.py test_ui_controls.py dwg_provider.py dwg_ui.py dwg_conversion.py dxf_regapp_integrity.py test_dxf_regapp_v10225.py test_dwg_provider.py test_dwg_conversion_v10222.py cad_sheet_layout.py test_cad_sheets.py reference_cad_profile.py reference_pdf_layout.py test_reference_dxf2018.py reference_demo.py starlite_logo.py pbs_identity.py pbs_login_gate.py test_identity_and_logo.py template_symbols.py exact_template.py original_frame.py reference_pdf_glyphs.py drafter_annotations.py original_dxf_blocks.py reference_basemap.py reference_sheets.py test_reference_source_v1021.py test_exact_titleblock_v1022.py test_exact_template.py test_reference_pdf_glyphs.py test_drafter_v1020.py
+        run: python -m py_compile app.py launcher.py kml_support.py test_hc_audit_v10228.py osm_acquisition.py osm_road_recovery.py test_osm_road_recovery_v1026.py engineering_render.py export_worker.py export_progress_ui.py test_export_progress_v10227.py building_sources.py drafter_titleblock.py road_topology.py test_wrapper.py test_osm.py test_engineering.py test_buildings.py test_junctions.py google_auto.py responsive_ui.py footprint_classify.py test_responsive.py test_gui_smoke.py test_footprint_audit.py adaptive_sheets.py test_adaptive_sheets.py google_stream.py test_google_stream.py drawing_settings.py test_ui_controls.py dwg_provider.py dwg_ui.py dwg_conversion.py dxf_regapp_integrity.py test_dxf_regapp_v10225.py test_dwg_provider.py test_dwg_conversion_v10222.py cad_sheet_layout.py test_cad_sheets.py reference_cad_profile.py reference_pdf_layout.py test_reference_dxf2018.py reference_demo.py starlite_logo.py pbs_identity.py pbs_login_gate.py test_identity_and_logo.py template_symbols.py exact_template.py original_frame.py reference_pdf_glyphs.py drafter_annotations.py original_dxf_blocks.py reference_basemap.py reference_sheets.py test_reference_source_v1021.py test_exact_titleblock_v1022.py test_exact_template.py test_reference_pdf_glyphs.py test_drafter_v1020.py
       - name: Run regression suite
-        run: python -m unittest -v test_wrapper test_osm test_osm_road_recovery_v1026 test_engineering test_export_progress_v10227 test_buildings test_junctions test_responsive test_footprint_audit test_adaptive_sheets test_google_stream test_ui_controls test_dwg_provider test_dwg_conversion_v10222 test_dxf_regapp_v10225 test_cad_sheets test_reference_dxf2018 test_identity_and_logo test_exact_template test_reference_pdf_glyphs test_drafter_v1020 test_reference_source_v1021 test_lemahabang_precon_v1022 test_exact_titleblock_v1022
+        run: python -m unittest -v test_wrapper test_osm test_osm_road_recovery_v1026 test_engineering test_export_progress_v10227 test_buildings test_junctions test_responsive test_footprint_audit test_adaptive_sheets test_google_stream test_ui_controls test_dwg_provider test_dwg_conversion_v10222 test_dxf_regapp_v10225 test_cad_sheets test_reference_dxf2018 test_identity_and_logo test_exact_template test_reference_pdf_glyphs test_drafter_v1020 test_reference_source_v1021 test_lemahabang_precon_v1022 test_hc_audit_v10228 test_exact_titleblock_v1022
       - name: Windows interactive-widget smoke test
         run: python -m unittest -v test_gui_smoke test_adaptive_sheets
       - name: Generate offline A3 reference PDF and DXF
@@ -47,7 +47,7 @@ jobs:
       - name: Upload A3 reference PDF and DXF sample
         uses: actions/upload-artifact@v4
         with:
-          name: PBS_NRP_v1.0.22.7_Async_Export_Progress_Demo
+          name: PBS_NRP_v1.0.22.8_HC_Numeric_CAD_Parity_Demo
           path: reference_demo_output/*
           if-no-files-found: error
       - name: Build portable Windows EXE
@@ -63,6 +63,6 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: PBS_NRP_Generator_Win64_v1.0.22.7_Async_Export_Progress
+          name: PBS_NRP_Generator_Win64_v1.0.22.8_HC_Numeric_CAD_Parity
           path: dist/PBS_NRP_Generator.exe
           if-no-files-found: error
