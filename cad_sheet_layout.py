@@ -247,7 +247,7 @@ def _build_tab(draw, project, sheetname, index, total, stats):
     text(f"Halaman / Page : {index+1} OF {total}",foot_mid+1.5,footer_bottom+3.0,1.5)
 
 
-def attach_a3_layouts(doc,sheets,project_name="",osm=None):
+def attach_a3_layouts(doc,sheets,project_name="",osm=None,progress=None):
     """Build one editable A3 paper-space layout and viewport PER NRP PDF sheet.
 
     ModelSpace stays geographic/projected in metres, PaperSpace is millimetres.
@@ -316,5 +316,7 @@ def attach_a3_layouts(doc,sheets,project_name="",osm=None):
         except Exception:
             pass
         ids.append(name)
+        if progress:
+            progress(i+1,len(sheets),title)
     doc.header["$MEASUREMENT"]=1
     return ids

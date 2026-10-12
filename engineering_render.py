@@ -236,16 +236,17 @@ def _draw_titleblock(c, x, y, w, h, title, sheetname, index, count, osm):
     c.restoreState()
 
 
-def draw_pdf(path,lines,points,project,page_w,page_h,title,sheets,osm=None):
+def draw_pdf(path,lines,points,project,page_w,page_h,title,sheets,osm=None,progress=None):
     """Reference CAD 2018 A3 layout, matching the DXF PaperSpace page geometry.
 
     The same cad_sheet_layout._build_tab() is used by PDF and DXF/DWG layouts.
     """
     from reference_pdf_layout import draw_pdf_reference
-    return draw_pdf_reference(path,lines,points,project,page_w,page_h,title,sheets,osm)
+    return draw_pdf_reference(path,lines,points,project,page_w,page_h,title,sheets,osm,progress=progress)
 
-def draw_dxf(path,lines,points,sheets,osm=None):
+def draw_dxf(path,lines,points,sheets,osm=None,progress=None):
     """Projected-meter DXF: two road edges + closed building footprint polylines."""
+    if progress: progress(.03,"Menyiapkan DXF AutoCAD 2018, layer & CAD blocks")
     doc=ezdxf.new("R2018")
     m=doc.modelspace()
     for name,color in [("FEEDER",1),("SUBFEEDER",200),("DISTRIBUSI",6),
@@ -285,6 +286,7 @@ def draw_dxf(path,lines,points,sheets,osm=None):
             if len(geo) >= 4:
                 m.add_lwpolyline([metric(p) for p in geo],close=True,
                                  dxfattribs={"layer":"Jalan" if reference_mode else "OSM_ROAD_EDGES"})
+    if progress: progress(.25,"Geometri jalan dan footprint diproses")
     for name,cat,geo in lines:
         if len(geo)<2:
             continue
@@ -292,6 +294,7 @@ def draw_dxf(path,lines,points,sheets,osm=None):
                      else (cat if cat in COLORS else "DISTRIBUSI"))
         m.add_lwpolyline([metric(p) for p in geo],
                          dxfattribs={"layer":route_layer})
+    if progress: progress(.38,"Menempatkan feeder, distribusi dan titik perangkat")
     style=(osm or {}).get("_drawing_style",{})
     radius=float(style.get("point_size",2.0))
     labels=bool(style.get("point_labels",True))
@@ -353,14 +356,20 @@ def draw_dxf(path,lines,points,sheets,osm=None):
                 "height":1.7,"insert":text_position,
                 "layer":"TEXT" if reference_mode else "LABELS",
                 "style":"PBS_DRAFTER_TAHOMA","color":30})
+    if progress: progress(.62,"Menulis HP numerik dan simbol perangkat")
     doc.header["$INSUNITS"]=6
     # CAD sheet parity: each PDF page also receives its own editable A3
     # PaperSpace layout and model viewport, convertible to DWG ACAD2018 by ODA.
     project_name=(osm or {}).get("_project_title","PBS NETWORK ROUTE PLAN")
-    attach_a3_layouts(doc,sheets,project_name=project_name,osm=osm)
+    def on_sheet(index,total,title):
+        if progress: progress(.64+.24*index/max(total,1),
+                              f"PaperSpace A3 {index}/{total}: {title}")
+    attach_a3_layouts(doc,sheets,project_name=project_name,osm=osm,
+                      progress=on_sheet if progress else None)
     # ODA 27.9 rejects XDATA 1001 references absent from TABLES/APPID even
     # when ezdxf.audit() says zero errors (e.g. GradientColor2ACI).
     # Must execute after all native block + PaperSpace imports.
+    if progress: progress(.91,"Memeriksa APPID XDATA kompatibilitas ODA")
     from dxf_regapp_integrity import ensure_xdata_regapps, missing_xdata_regapps
     ensure_xdata_regapps(doc)
     unregistered=missing_xdata_regapps(doc)
@@ -369,12 +378,15 @@ def draw_dxf(path,lines,points,sheets,osm=None):
     # Original CAD layout can introduce unresolved DASHED2 linetypes and
     # annotation-scale dictionary keys. Audit before saving so ODA 27.9 does
     # not receive avoidable invalid DXF references.
+    if progress: progress(.95,"Audit struktur DXF")
     cad_audit=doc.audit()
     if cad_audit.errors:
         raise ValueError(
             f"DXF menghasilkan {len(cad_audit.errors)} error CAD. "
             "Ekspor DWG dihentikan; periksa geometri atau template.")
+    if progress: progress(.98,"Menyimpan DXF ke folder output")
     doc.saveas(path)
+    if progress: progress(1.0,"DXF AutoCAD 2018 selesai")
 
 
 def draw_preview(canvas,bb,lines,points,osm,mainmap):

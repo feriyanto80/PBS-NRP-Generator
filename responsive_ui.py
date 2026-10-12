@@ -1,4 +1,4 @@
-"""Adaptive desktop shell v1.0.22.6.
+"""Adaptive desktop shell v1.0.22.7.
 
 Three-pane desktop, two-pane laptop and single-pane small-screen layouts.
 Independent mousewheel/+/- zoom and mouse-drag pan on map and sheet previews.
@@ -53,6 +53,8 @@ class ResponsiveNRP(DWGAutoMixin, NRPApp):
         self._sheet_report = {}
         self._planning = False
         self._running = False
+        self._export_active = False
+        self._export_dialog = None
         self._progress_percent = 0.0
         self._last_download_logged = -1
         self._kml_audit = {}
@@ -94,7 +96,7 @@ class ResponsiveNRP(DWGAutoMixin, NRPApp):
         self.google_download_stage = tk.StringVar(value="Google Buildings · menunggu unduhan")
         self.google_download_detail = tk.StringVar(value="Belum ada file yang sedang diunduh")
         self.overall_progress_label = tk.StringVar(value="PROGRES PEKERJAAN · 0%")
-        root.title("PBS Network Route Plan Generator v1.0.22.6")
+        root.title("PBS Network Route Plan Generator v1.0.22.7")
         root.configure(bg="#eef2f6")
         sw, sh = root.winfo_screenwidth(), root.winfo_screenheight()
         dw=max(620,min(sw-60,1550))
@@ -111,7 +113,7 @@ class ResponsiveNRP(DWGAutoMixin, NRPApp):
         root=self.root
         header=tk.Frame(root,bg="#164b82",height=53)
         header.pack(fill="x")
-        tk.Label(header,text="PBS  Network Route Plan Generator   v1.0.22.6",
+        tk.Label(header,text="PBS  Network Route Plan Generator   v1.0.22.7",
                  bg="#164b82",fg="white",font=("Segoe UI",15,"bold"),
                  anchor="w").pack(side="left",fill="x",expand=True,padx=16,pady=10)
         self.header_steps=tk.Frame(root,bg="#e4edf6")
@@ -778,15 +780,18 @@ class ResponsiveNRP(DWGAutoMixin, NRPApp):
             self._update_generate_button()
 
     def _update_generate_button(self):
-        busy=self._running or self._osm_loading or self._footprint_loading or self._planning
+        busy=(self._running or self._osm_loading or self._footprint_loading
+              or self._planning or self._export_active)
         self.generate_button.configure(
             state="disabled" if busy else "normal",
             bg="#8d9aa5" if busy else "#17813e",
-            text=("⏳ Akuisisi berjalan · Export terkunci"
+            text=("⏳ Generate PDF/DXF/DWG berjalan"
+                  if self._export_active else
+                  "⏳ Akuisisi berjalan · Export terkunci"
                   if busy else "▶ Generate PDF + DXF (+ DWG)"))
 
     def open_kmz(self):
-        if self._running or self._osm_loading or self._planning:
+        if self._running or self._osm_loading or self._planning or self._export_active:
             messagebox.showwarning("Akuisisi berjalan",
                 "Tunggu proses OSM + Google selesai sebelum mengganti proyek.")
             return
@@ -950,7 +955,7 @@ class ResponsiveNRP(DWGAutoMixin, NRPApp):
         if not self.lines and not self.points:
             messagebox.showwarning("OSM Jalan","Import KML/KMZ dahulu.")
             return
-        if self._running or self._osm_loading or self._footprint_loading or self._planning:
+        if self._running or self._osm_loading or self._footprint_loading or self._planning or self._export_active:
             self.status.set("Tunggu pekerjaan lain selesai sebelum Retry Jalan OSM.")
             return
         revision=self._revision
@@ -1087,7 +1092,7 @@ class ResponsiveNRP(DWGAutoMixin, NRPApp):
         if gate is not None and not gate.session:
             messagebox.showerror("PBS ID", "Sesi PBS Central tidak aktif. Login diperlukan.")
             return
-        if self._running or self._osm_loading or self._footprint_loading or self._planning:
+        if self._running or self._osm_loading or self._footprint_loading or self._planning or self._export_active:
             messagebox.showwarning("Export terkunci",
                 "Tunggu akuisisi OSM/Google dan perhitungan sheet selesai.")
             return
@@ -1119,22 +1124,70 @@ class ResponsiveNRP(DWGAutoMixin, NRPApp):
             return
         if not self._planned_sheets and (self.lines or self.points):
             self._rebuild_sheet_plan()
-        old_sheets=base_app.sheets_for
-        original=(self.lines,self.points,self.osm)
-        self.lines,self.points,self.osm=apply_presentation(*original,self._layer_options())
-        # Metadata only, never modify the imported KML/Google records.
-        self.osm["_project_title"]=os.path.splitext(
-            os.path.basename(self.path.get() or "PBS NETWORK ROUTE PLAN"))[0]
-        self.osm["_cad_reference_style"]=bool(self.cad_reference_style.get())
-        try:
-            # Same layer settings on preview, PDF and DXF.
-            base_app.sheets_for=lambda _bbox:list(self._planned_sheets)
-            super().export()
-        finally:
-            base_app.sheets_for=old_sheets
-            self.lines,self.points,self.osm=original
+        # All filedialogs, licensing prompts, and Tk variable reads are
+        # completed on the GUI thread BEFORE the renderer worker starts.
+        if self.use_osm.get():
+            current=self.osm or {}
+            roads=len(current.get("roads",[]))
+            buildings=len(current.get("buildings",[]))
+            if roads==0 or buildings==0 or current.get("partial"):
+                if not messagebox.askyesno(
+                    "Data basemap belum lengkap",
+                    f"Jalan OSM: {roads:,}\n"
+                    f"Footprint gabungan: {buildings:,}\n"
+                    f"OSM parsial: {bool(current.get('partial'))}\n\n"
+                    "Lanjut ekspor dengan data yang tersedia?"):
+                    if restore_dwg:
+                        self.want_dwg.set(True)
+                    return
+        folder=filedialog.askdirectory(title="Pilih folder output PDF + DXF (+ DWG)")
+        if not folder:
             if restore_dwg:
                 self.want_dwg.set(True)
+            return
+        try:
+            shown_lines,shown_points,shown_osm=apply_presentation(
+                self.lines,self.points,self.osm,self._layer_options())
+            snapshot=dict(shown_osm or {})
+            snapshot["_drawing_style"]=dict(snapshot.get("_drawing_style",{}))
+            snapshot["_project_title"]=os.path.splitext(
+                os.path.basename(self.path.get() or "PBS NETWORK ROUTE PLAN"))[0]
+            snapshot["_cad_reference_style"]=bool(self.cad_reference_style.get())
+            from export_progress_ui import ExportProgressDialog
+            config={
+                "folder":folder,
+                "title":os.path.splitext(os.path.basename(self.path.get()))[0],
+                "lines":list(shown_lines),
+                "points":list(shown_points),
+                "sheets":list(self._planned_sheets),
+                "osm":snapshot if self.use_osm.get() else None,
+                "want_dwg":bool(self.want_dwg.get()),
+                "converter":self.converter.get()
+            }
+            self._export_active=True
+            self._update_generate_button()
+            self._export_dialog=ExportProgressDialog(
+                self.root,config,on_finish=self._export_finished)
+            self.status.set("Generate berjalan · lihat popup progress.")
+        except Exception as exc:
+            self._export_active=False
+            self._update_generate_button()
+            messagebox.showerror("Tidak dapat memulai ekspor",str(exc))
+        finally:
+            if restore_dwg:
+                self.want_dwg.set(True)
+
+    def _export_finished(self,result,error):
+        """Called on the Tk thread after background worker completion."""
+        self._export_active=False
+        self._update_generate_button()
+        if error:
+            self.status.set("Ekspor gagal · lihat log popup progress")
+        elif result.warning:
+            self.status.set("PDF/DXF selesai · DWG mengalami peringatan")
+        else:
+            self.status.set(f"Export selesai · {len(result.files)} file disimpan di {result.output_dir}")
+
 
 
 if __name__=="__main__":
