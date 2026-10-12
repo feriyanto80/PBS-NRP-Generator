@@ -1,4 +1,4 @@
-"""Adaptive desktop shell v1.0.22.5.
+"""Adaptive desktop shell v1.0.22.6.
 
 Three-pane desktop, two-pane laptop and single-pane small-screen layouts.
 Independent mousewheel/+/- zoom and mouse-drag pan on map and sheet previews.
@@ -81,7 +81,6 @@ class ResponsiveNRP(DWGAutoMixin, NRPApp):
         self.layer_flags = {name:tk.BooleanVar(value=True) for name in (
             "feeder","subfeeder","distribution","points","roads","buildings")}
         self.show_point_labels = tk.BooleanVar(value=True)
-        self.point_shape = tk.StringVar(value="Circle")
         self.point_size = tk.DoubleVar(value=2.0)
         self.target_points = tk.IntVar(value=230)
         self.target_routes = tk.IntVar(value=300)
@@ -93,7 +92,7 @@ class ResponsiveNRP(DWGAutoMixin, NRPApp):
         self.google_download_stage = tk.StringVar(value="Google Buildings · menunggu unduhan")
         self.google_download_detail = tk.StringVar(value="Belum ada file yang sedang diunduh")
         self.overall_progress_label = tk.StringVar(value="PROGRES PEKERJAAN · 0%")
-        root.title("PBS Network Route Plan Generator v1.0.22.5")
+        root.title("PBS Network Route Plan Generator v1.0.22.6")
         root.configure(bg="#eef2f6")
         sw, sh = root.winfo_screenwidth(), root.winfo_screenheight()
         dw=max(620,min(sw-60,1550))
@@ -110,7 +109,7 @@ class ResponsiveNRP(DWGAutoMixin, NRPApp):
         root=self.root
         header=tk.Frame(root,bg="#164b82",height=53)
         header.pack(fill="x")
-        tk.Label(header,text="PBS  Network Route Plan Generator   v1.0.22.5",
+        tk.Label(header,text="PBS  Network Route Plan Generator   v1.0.22.6",
                  bg="#164b82",fg="white",font=("Segoe UI",15,"bold"),
                  anchor="w").pack(side="left",fill="x",expand=True,padx=16,pady=10)
         self.header_steps=tk.Frame(root,bg="#e4edf6")
@@ -335,16 +334,7 @@ class ResponsiveNRP(DWGAutoMixin, NRPApp):
         tk.Checkbutton(panel,text="Tampilkan label titik pada detail PDF/DXF",
                        bg="white",anchor="w",variable=self.show_point_labels,
                        command=self.schedule_draw).pack(fill="x",padx=10,pady=(4,0))
-        shape_line=tk.Frame(panel,bg="white")
-        shape_line.pack(fill="x",padx=12,pady=(6,3))
-        tk.Label(shape_line,text="Simbol titik:",bg="white",
-                 font=("Segoe UI",8)).pack(side="left")
-        self.point_combo=ttk.Combobox(shape_line,textvariable=self.point_shape,
-                                      state="readonly",width=12,
-                                      values=("Circle","Square","Triangle"))
-        self.point_combo.pack(side="right",padx=(5,0))
-        self.point_combo.bind("<<ComboboxSelected>>",lambda e:self.schedule_draw())
-        tk.Label(panel,text="Ukuran simbol titik (1–5 pt)",bg="white",
+        tk.Label(panel,text="Ukuran simbol CAD sesuai legenda (1–5 pt)",bg="white",
                  anchor="w",font=("Segoe UI",8)).pack(fill="x",padx=12)
         tk.Scale(panel,from_=1,to=5,resolution=.5,orient="horizontal",
                  variable=self.point_size,bg="white",highlightthickness=0,
@@ -431,7 +421,6 @@ class ResponsiveNRP(DWGAutoMixin, NRPApp):
     def _layer_options(self):
         choices={key:value.get() for key,value in self.layer_flags.items()}
         choices["point_labels"]=self.show_point_labels.get()
-        choices["point_shape"]=self.point_shape.get()
         choices["point_size"]=self.point_size.get()
         return choices
 
