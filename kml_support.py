@@ -73,21 +73,46 @@ def parse_kml_bytes(source):
         if _tag_name(placemark.tag) != 'Placemark':
             continue
         name = next(((n.text or '').strip() for n in placemark if _tag_name(n.tag) == 'name'), '')
-        role=get_type(placemark)
-        # If the own name is a numeric ID but the Folder says T7 or ODP,
-        # provide the type to the downstream symbol classifier.
+        # Authoritative audit subtrees are NOT network equipment.
+        # Exception: residential candidates under 99.AUDIT_DESIGN/HC are
+        # explicitly requested for Lemahabang-style numeric HC annotation.
+        # Pole T40 and Road within 99.AUDIT_DESIGN must NOT be rendered as
+        # real installed poles or distribution cable.
+        ancestry=[]
+        ancestor=parents.get(placemark)
+        while ancestor is not None:
+            if _tag_name(ancestor.tag)=="Folder":
+                folder=next(((n.text or '').strip() for n in ancestor
+                             if _tag_name(n.tag)=="name"),"")
+                ancestry.append(folder)
+            ancestor=parents.get(ancestor)
         from template_symbols import canonical
-        styled_name=name
-        own_kind=canonical(name)
-        # A generic HP/numeric label does not override explicit device
-        # authority from Folder or ExtendedData (e.g. ODP/001/HP 008).
-        if role and (not own_kind or (own_kind=="HP" and role!="HP")):
-            if re.fullmatch(r"\d+",name):
-                styled_name=(role+" "+name).strip()
-            else:
-                # Do not print invented 'ODP ' / 'ODC ' prefixes on the
-                # PDF: the source label is 'W2_LMB_JKBN...', not 'ODP W2...'.
-                styled_name=TypedPointName(name,role)
+        audit_folder=next((i for i,folder in enumerate(ancestry)
+                           if folder.upper()=="99.AUDIT_DESIGN"),None)
+        if audit_folder is not None:
+            rc=re.fullmatch(r"RC_(\d{7})",name,re.IGNORECASE)
+            if (audit_folder!=1 or ancestry[0].upper()!="HC"
+                    or rc is None or int(rc.group(1))<1):
+                continue
+            # Never assign a new ID based on traversal order: preserve RC
+            # source suffix deterministically across reimports and exports.
+            label=f"{int(rc.group(1)):03d}"
+            styled_name=TypedPointName(label,"HP")
+            styled_name.nrp_source_id=name
+            styled_name.nrp_source_role="AUDIT_HC"
+            styled_name.nrp_verification="RESIDENTIAL_CANDIDATE"
+            role="HP"
+        else:
+            role=get_type(placemark)
+            # If the own name is a numeric ID but the Folder says T7 or ODP,
+            # provide its type to the downstream symbol classifier.
+            styled_name=name
+            own_kind=canonical(name)
+            if role and (not own_kind or (own_kind=="HP" and role!="HP")):
+                if re.fullmatch(r"\d+",name):
+                    styled_name=(role+" "+name).strip()
+                else:
+                    styled_name=TypedPointName(name,role)
         upper = (name+" "+(role or "")).upper()
         category = ('FEEDER' if 'FEEDER' in upper and 'SUB' not in upper else
                     'SUBFEEDER' if 'SUB' in upper else 'DISTRIBUSI')
