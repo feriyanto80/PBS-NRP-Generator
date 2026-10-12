@@ -234,7 +234,7 @@ def _pdf_map_annotations(c,points,project,style,viewport,sheet_index=0,source_mo
         c.restoreState()
 
 
-def draw_pdf_reference(path,lines,points,project,page_w,page_h,title,sheets,osm=None):
+def draw_pdf_reference(path,lines,points,project,page_w,page_h,title,sheets,osm=None,progress=None):
     """Reference-profile PDF with identical sheet geometry to exported DXF.
 
     All map features come from actual KML/OSM/Google data, never the reference DWG.
@@ -287,6 +287,8 @@ def draw_pdf_reference(path,lines,points,project,page_w,page_h,title,sheets,osm=
         original_titleblock(paper,title,sheetname,index,len(sheets),osm or {})
         c.restoreState()
         c.showPage()
+        if progress:
+            progress(index+1,len(sheets),sheetname)
     c.save()
     from exact_template import find_reference, overlay_pdf_upper_titleblock
     reference_pdf=(find_reference("pdf") if (osm or {}).get("_cad_reference_style",True) else None)
