@@ -1074,6 +1074,7 @@ class ResponsiveNRP(DWGAutoMixin, NRPApp):
         self._running=False
         self.osm_button.configure(state="normal",
                                   text="Ambil / gunakan cache OSM + Google")
+        self.road_recovery_button.configure(state="normal")
         self._update_generate_button()
         if not roads and not buildings:
             messagebox.showwarning("Basemap belum lengkap",
