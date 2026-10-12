@@ -90,6 +90,9 @@ class NRPApp(App):
             kml=audit_main_kml(path,bbox=bb)
             self._kml_audit=kml
             self.lines,self.points=lines,points
+            self._hc_candidate_count=sum(
+                getattr(name,"nrp_source_role","")=="AUDIT_HC"
+                for name,_ in points)
             self._input_polygons=kml["polygons"]
             self._raw_osm=None
             self._google_polygons=[]
@@ -98,6 +101,7 @@ class NRPApp(App):
             self.stats.config(text=(
                 f"Jalur (LineString)  {len(lines):,}\n"
                 f"Titik (Point)       {len(points):,}\n"
+                f"HC kandidat audit   {self._hc_candidate_count:,} (nomor teks, belum survei)\n"
                 f"Poligon KML mentah {kml['raw_polygons']:,}\n"
                 f"Bangunan KML valid {len(self._input_polygons):,}\n"
                 f"Nonbangunan/tak terklasifikasi {kml['unclassified_polygons']:,}\n"
