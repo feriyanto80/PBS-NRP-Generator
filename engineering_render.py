@@ -421,6 +421,14 @@ def draw_dxf(path,lines,points,sheets,osm=None):
     # PaperSpace layout and model viewport, convertible to DWG ACAD2018 by ODA.
     project_name=(osm or {}).get("_project_title","PBS NETWORK ROUTE PLAN")
     attach_a3_layouts(doc,sheets,project_name=project_name,osm=osm)
+    # ODA 27.9 rejects XDATA 1001 references absent from TABLES/APPID even
+    # when ezdxf.audit() says zero errors (e.g. GradientColor2ACI).
+    # Must execute after all native block + PaperSpace imports.
+    from dxf_regapp_integrity import ensure_xdata_regapps, missing_xdata_regapps
+    ensure_xdata_regapps(doc)
+    unregistered=missing_xdata_regapps(doc)
+    if unregistered:
+        raise ValueError("DXF invalid APPID: "+", ".join(unregistered))
     # Original CAD layout can introduce unresolved DASHED2 linetypes and
     # annotation-scale dictionary keys. Audit before saving so ODA 27.9 does
     # not receive avoidable invalid DXF references.

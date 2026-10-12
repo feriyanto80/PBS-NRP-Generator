@@ -19,6 +19,9 @@ _DWG_HEADER=b"AC1032"
 # argument is present. Try the proven format *first*, unmodified DXF.
 _ODAFILTERS=((False,None,"1"),
              (False,None,"0"),
+             # Newly registered APPID fallback for an older generated DXF:
+             # use the original six-argument ODA command with repaired copy.
+             (False,None,"0"),
              (True,"*.dxf","1"),
              (True,"*.dxf","0"),
              (True,"*.DWG;*.DXF","0"))
@@ -53,6 +56,11 @@ def _sanitize_dxf(source,dest,log):
     try:
         import ezdxf
         doc=ezdxf.readfile(str(dest))
+        from dxf_regapp_integrity import ensure_xdata_regapps
+        registered=ensure_xdata_regapps(doc)
+        if registered:
+            log.append("Registered missing XDATA APPID: "+
+                       ", ".join(f"{k}({n})" for k,n in registered.items()))
         auditor=doc.audit()
         log.append(f"Source DXF: {source.stat().st_size} bytes, {doc.dxfversion}")
         log.append(f"DXF auditor: {len(auditor.errors)} errors, "
@@ -65,7 +73,7 @@ def _sanitize_dxf(source,dest,log):
             # Keep a copy of the source for ODA to inspect even if repair
             # cannot be completed. Do not overwrite the original PDF/DXF.
             return
-        if auditor.fixes:
+        if auditor.fixes or registered:
             doc.saveas(str(dest))
         log.append("Staged DXF: "+str(dest.stat().st_size)+" bytes")
     except Exception as error:
@@ -87,6 +95,14 @@ def _launch(command,log,stage,timeout=120):
     except OSError as error:
         log.append("ODA execution error: "+repr(error))
         return None
+    # ODA CLI may return exit code 0 while writing only *.dwg.err.
+    # Capture the actual diagnostic instead of misleading "no DWG".
+    for err in sorted(Path(stage).rglob("*.dwg.err")):
+        try:
+            log.append("ODA .dwg.err "+str(err)+": "+
+                       err.read_text(encoding="utf-8",errors="replace")[-1800:])
+        except OSError:
+            pass
     results=_dwg_files(stage)
     log.append("DWG discovered: "+str(len(results)))
     for p in results[:12]:
@@ -146,7 +162,7 @@ def convert_dwg(dxf_path,converter):
     exe=str(Path(converter).resolve())
     target=source.with_suffix(".dwg")
     log=[
-        "PBS NRP Generator · ODA Converter Diagnostic v1.0.22.4",
+        "PBS NRP Generator · ODA Converter Diagnostic v1.0.22.5",
         f"DXF sumber: {source.name}",f"ODA: {exe}",
         f"File tujuan: {target}","Target: DWG AutoCAD 2018 (AC1032)",
         "Note: exit code 0 does NOT guarantee a converted DWG.",
