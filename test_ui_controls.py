@@ -18,7 +18,7 @@ class LayerSettingTests(unittest.TestCase):
         self.lines=[
           ("FEEDER 96C","FEEDER",[(107.0,-6.0),(107.001,-6.001)]),
           ("Distribution","DISTRIBUSI",[(107.001,-6.001),(107.002,-6.002)])]
-        self.points=[("Pole 001",(107.001,-6.001))]
+        self.points=[("T6",(107.001,-6.001))]
         self.osm={"roads":[[(107.0,-6.0),(107.003,-6.002)]],
                   "buildings":[[(107.001,-6.001),(107.0012,-6.001),
                                 (107.0012,-6.0013),(107.001,-6.001)]]}
@@ -37,7 +37,7 @@ class LayerSettingTests(unittest.TestCase):
         self.assertEqual(osm["buildings"],[])
         self.assertEqual(len(self.lines),2)
         self.assertEqual(len(self.osm["roads"]),1)
-        self.assertEqual(osm["_drawing_style"]["point_shape"],"Square")
+        self.assertNotIn("point_shape",osm["_drawing_style"])
 
     def test_dxf_symbols_and_labels_changes_real_export(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -51,7 +51,8 @@ class LayerSettingTests(unittest.TestCase):
             model=ezdxf.readfile(path).modelspace()
             self.assertEqual(len(model.query('LWPOLYLINE[layer=="FEEDER"]')),0)
             self.assertEqual(len(model.query('LWPOLYLINE[layer=="DISTRIBUSI"]')),1)
-            self.assertEqual(len(model.query('LWPOLYLINE[layer=="POINTS"]')),1)
+            self.assertEqual(len(model.query('LWPOLYLINE[layer=="POINTS"]')),0)
+            self.assertGreaterEqual(len(model.query('CIRCLE')),1)
             self.assertEqual(len(model.query('TEXT[layer=="LABELS"]')),0)
             pdf=os.path.join(temp,"setting.pdf")
             draw_pdf(pdf,lines,points,None,*landscape(A3),
@@ -60,7 +61,7 @@ class LayerSettingTests(unittest.TestCase):
 
     def test_point_shape_limits(self):
         _,_,osm=apply_presentation([],[],None,{"point_shape":"nonsense","point_size":99})
-        self.assertEqual(osm["_drawing_style"]["point_shape"],"Circle")
+        self.assertNotIn("point_shape",osm["_drawing_style"])
         self.assertEqual(osm["_drawing_style"]["point_size"],5.0)
 
 
